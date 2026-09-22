@@ -1,0 +1,24 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+.vs/
+appsettings.*.local.json
+
+## Secrets / env
+.env
+*.pfx
+
+## Rider / VS Code
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log

@@ -1,0 +1,25 @@
+@baseUrl = http://localhost:8080
+
+### Đăng ký
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Nguyen Van A",
+  "email": "customer1@example.com",
+  "password": "Password123!",
+  "phoneNumber": "0900000000",
+  "role": 0
+}
+
+### Đăng nhập
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "customer1@example.com",
+  "password": "Password123!"
+}
+
+### Xem danh sách dịch vụ
+GET {{baseUrl}}/api/servicecategories
