@@ -24,5 +24,9 @@ public class SettlementOptions
     public int ViolationPointsToSuspend { get; set; } = 3;
     public int SuspendDays { get; set; } = 7;
 
+    // US37 – Tasker không đến (FR-28)
+    public int NoShowMinutes { get; set; } = 30;
+    public int NoShowAutoCancelHours { get; set; } = 2;
+
     public decimal LowBalanceThreshold { get; set; } = 50_000m;
 }

@@ -59,8 +59,8 @@ public class CancellationService
         return (0m, $"Hủy trước giờ hẹn từ {_opt.LateCancelHours:0} giờ trở lên – miễn phí.");
     }
 
-    /// <summary>Đơn đã bị đánh dấu Tasker không đến (US37 – Sprint 6).</summary>
-    protected virtual bool IsTaskerNoShow(Booking booking) => false;
+    /// <summary>US37 – đơn đã bị đánh dấu Tasker không đến → hủy miễn phí, hoàn 100%.</summary>
+    private static bool IsTaskerNoShow(Booking booking) => booking.IsTaskerNoShow;
 
     private async Task<bool> HasTaskerArrivedAsync(Booking booking, DateTime now)
     {

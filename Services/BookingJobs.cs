@@ -20,10 +20,15 @@ public class BookingJobs
     private readonly SettlementOptions _opt;
     private readonly ILogger<BookingJobs> _logger;
     private readonly CancellationService _cancellation;
+    private readonly TaskerDisciplineService _discipline;
+    private readonly WalletService _wallet;
 
     public BookingJobs(AppDbContext db, INotificationService notifications, SettlementService settlement,
-        IOptions<SettlementOptions> options, ILogger<BookingJobs> logger, CancellationService cancellation)
+        IOptions<SettlementOptions> options, ILogger<BookingJobs> logger, CancellationService cancellation,
+        TaskerDisciplineService discipline, WalletService wallet)
     {
+        _discipline = discipline;
+        _wallet = wallet;
         _cancellation = cancellation;
         _db = db;
         _notifications = notifications;
@@ -139,6 +144,77 @@ public class BookingJobs
                     $"Đơn #{booking.Id} đã hết hạn vì chưa có Tasker nhận. Bạn có thể tạo đơn mới.");
                 await _db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _logger.LogInformation("Đơn {Id} đã được xử lý bởi thao tác khác, bỏ qua", id);
+            }
+            finally
+            {
+                _db.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    /// <summary>
+    /// US37 / FR-28 – quá 30 phút sau giờ hẹn mà Tasker chưa Bắt đầu: đánh dấu không đến, cộng 1 điểm vi phạm,
+    /// giải phóng tạm giữ ví, báo khách chọn Tìm Tasker khác / Hủy. Khách không chọn trong 2 giờ → tự hủy, hoàn 100%.
+    /// </summary>
+    public async Task DetectNoShowAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var lateBefore = now.AddMinutes(-_opt.NoShowMinutes);
+        var ids = await _db.Bookings
+            .Where(b => b.Status == BookingStatus.Accepted && !b.IsTaskerNoShow && b.TaskerId != null
+                        && b.ScheduledTime <= lateBefore)
+            .Select(b => b.Id)
+            .Take(100)
+            .ToListAsync(ct);
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                await using var tx = await _db.Database.BeginTransactionAsync(ct);
+                var booking = await _db.Bookings.FirstAsync(b => b.Id == id, ct);
+                if (booking.Status != BookingStatus.Accepted || booking.IsTaskerNoShow) continue;
+                var taskerId = booking.TaskerId!.Value;
+
+                booking.IsTaskerNoShow = true;
+                booking.NoShowAt = now;
+                booking.UpdatedAt = now;
+                await _discipline.AddViolationAsync(taskerId, 1, $"không đến đơn #{booking.Id} đúng hẹn");
+                _notifications.Add(booking.CustomerId, "Tasker chưa đến",
+                    $"Tasker chưa đến đơn #{booking.Id} sau {_opt.NoShowMinutes} phút. Bạn có thể Tìm Tasker khác hoặc Hủy (hoàn 100%). " +
+                    $"Nếu không chọn trong {_opt.NoShowAutoCancelHours} giờ, đơn sẽ tự hủy.");
+                await _db.SaveChangesAsync(ct);
+                await _wallet.RecalculateReservedAsync(taskerId);
+                await _db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _logger.LogInformation("Đơn {Id} đã được xử lý bởi thao tác khác, bỏ qua", id);
+            }
+            finally
+            {
+                _db.ChangeTracker.Clear();
+            }
+        }
+
+        // Tự hủy & hoàn 100% khi khách không chọn phương án trong 2 giờ
+        var cancelBefore = now.AddHours(-_opt.NoShowAutoCancelHours);
+        var toCancel = await _db.Bookings
+            .Where(b => b.Status == BookingStatus.Accepted && b.IsTaskerNoShow && b.NoShowAt != null && b.NoShowAt <= cancelBefore)
+            .Select(b => b.Id)
+            .Take(100)
+            .ToListAsync(ct);
+        foreach (var id in toCancel)
+        {
+            try
+            {
+                var booking = await _db.Bookings.Include(b => b.Payment).FirstAsync(b => b.Id == id, ct);
+                await _cancellation.CancelAsync(booking, "Tasker không đến và bạn chưa chọn phương án – hệ thống tự hủy, hoàn 100%.", bySystem: true);
             }
             catch (DbUpdateConcurrencyException)
             {

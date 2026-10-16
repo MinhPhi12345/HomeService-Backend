@@ -58,7 +58,8 @@ public class WalletService
             .Where(b => b.TaskerId == taskerId
                         && b.PaymentMethod == PaymentMethod.Cash
                         && (b.Status == BookingStatus.Accepted || b.Status == BookingStatus.InProgress)
-                        && b.Payment == null)
+                        && b.Payment == null
+                        && !b.IsTaskerNoShow)
             .Select(b => new { b.TotalPrice, b.CommissionRate })
             .ToListAsync();
         profile.ReservedAmount = bookings.Sum(b => Money.Commission(b.TotalPrice, b.CommissionRate));

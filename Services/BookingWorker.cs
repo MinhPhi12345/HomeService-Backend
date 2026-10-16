@@ -29,6 +29,7 @@ public class BookingWorker : BackgroundService
             await RunStepAsync<MatchingService>(s => s.ProcessDueBookingsAsync(stoppingToken), "ghép nối", stoppingToken);
             await RunStepAsync<BookingJobs>(s => s.AutoConfirmAsync(stoppingToken), "tự xác nhận hoàn thành", stoppingToken);
             await RunStepAsync<BookingJobs>(s => s.ExpireNoTaskerFoundAsync(stoppingToken), "hết hạn đơn chưa có Tasker", stoppingToken);
+            await RunStepAsync<BookingJobs>(s => s.DetectNoShowAsync(stoppingToken), "phát hiện Tasker không đến", stoppingToken);
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }

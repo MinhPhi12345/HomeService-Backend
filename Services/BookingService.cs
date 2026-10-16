@@ -128,6 +128,7 @@ public class BookingService : IBookingService
             .FirstOrDefaultAsync(b => b.Id == bookingId)
             ?? throw ApiException.NotFound();
         if (booking.TaskerId != taskerId) throw ApiException.Forbidden();
+        if (booking.IsTaskerNoShow) throw ApiException.Conflict("Đơn đã quá giờ hẹn, không thể bắt đầu."); // FR-28
 
         var now = DateTime.UtcNow;
         var target = request.Status!.Value;
@@ -214,15 +215,28 @@ public class BookingService : IBookingService
         var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId)
                       ?? throw ApiException.NotFound();
         if (booking.CustomerId != customerId) throw ApiException.Forbidden();
-        if (booking.Status != BookingStatus.NoTaskerFound)
+        // FR-28: cũng cho phép "Tìm Tasker khác" khi Tasker không đến
+        var noShowRetry = booking.Status == BookingStatus.Accepted && booking.IsTaskerNoShow;
+        if (booking.Status != BookingStatus.NoTaskerFound && !noShowRetry)
             throw ApiException.BadRequest("Đơn không ở trạng thái chờ thử lại.");
         if (booking.MatchRound >= _matching.MaxRounds)
             throw ApiException.BadRequest("Đã vượt quá số lần thử lại.");
 
         if (request?.ScheduledTime is not null)
             booking.ScheduledTime = ValidateScheduledTime(request.ScheduledTime.Value);
+        else if (noShowRetry)
+            booking.ScheduledTime = RoundUpToFiveMinutes(DateTime.UtcNow.AddHours(1)); // giờ hẹn cũ đã qua → sớm nhất có thể
         else if (booking.ScheduledTime <= DateTime.UtcNow)
             throw ApiException.BadRequest("Thời gian đặt không hợp lệ.");
+
+        int? oldTasker = null;
+        if (noShowRetry)
+        {
+            oldTasker = booking.TaskerId;
+            booking.TaskerId = null;
+            booking.IsTaskerNoShow = false;
+            booking.NoShowAt = null;
+        }
 
         // Vòng mới: chạy lại từ đợt 1; Tasker đã được mời ở vòng trước được xét lại
         booking.MatchRound += 1;
@@ -230,6 +244,15 @@ public class BookingService : IBookingService
         booking.NextMatchAt = null;
         booking.Status = BookingStatus.Pending;
         booking.UpdatedAt = DateTime.UtcNow;
+        if (oldTasker is not null)
+            _notifications.Add(oldTasker.Value, "Đơn đã được chuyển cho Tasker khác",
+                $"Đơn #{booking.Id} đã được chuyển cho Tasker khác vì bạn không đến đúng hẹn.");
         await _db.SaveChangesAsync();
+    }
+
+    private static DateTime RoundUpToFiveMinutes(DateTime utc)
+    {
+        var ticks = TimeSpan.FromMinutes(5).Ticks;
+        return new DateTime((utc.Ticks + ticks - 1) / ticks * ticks, DateTimeKind.Utc);
     }
 }
