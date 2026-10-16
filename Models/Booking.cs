@@ -55,6 +55,9 @@ public class Booking
     public bool IsTaskerNoShow { get; set; }
     public DateTime? NoShowAt { get; set; }
 
+    // US29 – đã gửi nhắc lịch trước giờ hẹn
+    public DateTime? ReminderSentAt { get; set; }
+
     // US14 – phí hủy đã tính khi khách hủy (BR-C01)
     public decimal CancellationFee { get; set; }
 

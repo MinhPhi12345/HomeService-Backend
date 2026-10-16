@@ -39,6 +39,7 @@ builder.Services.AddScoped<DisputeService>();
 builder.Services.Configure<BusinessOptions>(builder.Configuration.GetSection(BusinessOptions.Section));
 builder.Services.Configure<MatchingOptions>(builder.Configuration.GetSection(MatchingOptions.Section));
 builder.Services.Configure<SettlementOptions>(builder.Configuration.GetSection(SettlementOptions.Section));
+builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.Section));
 
 // --- Tác vụ nền: ghép nối theo đợt, hết hạn thanh toán, tự xác nhận... ---
 builder.Services.AddHostedService<BookingWorker>();
@@ -94,6 +95,7 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddRouting(o => o.LowercaseUrls = true); // SRS 8.1: đường dẫn viết chữ thường (/api/bookings)
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Encoder = JsonDefaults.Encoder); // giữ tiếng Việt có dấu
 builder.Services.AddEndpointsApiExplorer();
