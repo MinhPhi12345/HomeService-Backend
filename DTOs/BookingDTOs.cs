@@ -88,6 +88,8 @@ public class BookingResponse
     /// <summary>SĐT khách – chỉ trả cho Tasker của đơn khi đơn đang Accepted/InProgress (US20), còn lại null.</summary>
     public string? CustomerPhone { get; init; }
     public string? TaskerPhone { get; init; }
+    /// <summary>US15/US25/US26 – người đang xem còn đánh giá được đơn này không (đơn hoàn thành & chưa đánh giá).</summary>
+    public bool CanReview { get; init; }
 }
 
 // US14 – GET /api/bookings/{id}/cancellation-fee
