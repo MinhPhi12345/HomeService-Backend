@@ -8,4 +8,6 @@ public class SettlementOptions
     public int PaymentTimeoutMinutes { get; set; } = 15;
     public int CashMinCompletedOrders { get; set; } = 3;
     public decimal CashMaxOrderValue { get; set; } = 1_000_000m;
+    public int AutoConfirmHours { get; set; } = 24;
+    public int ReminderHoursBefore { get; set; } = 2;
 }
