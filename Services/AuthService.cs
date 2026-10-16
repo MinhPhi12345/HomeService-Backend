@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.DTOs;
 using HomeService.Api.Models;
@@ -42,16 +43,20 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email)
+        var email = NormalizeEmail(request.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email)
             ?? throw new UnauthorizedAccessException("Email hoặc mật khẩu không đúng.");
+
+        // Không nói rõ sai email hay sai mật khẩu để tránh dò tài khoản (FR-02)
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            throw new UnauthorizedAccessException("Email hoặc mật khẩu không đúng.");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tài khoản đã bị khóa.");
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            throw new UnauthorizedAccessException("Email hoặc mật khẩu không đúng.");
-
         var (token, expiresAt) = _tokenService.GenerateAccessToken(user);
         return new AuthResponse(user.Id, user.FullName, user.Email, user.Role, token, expiresAt);
     }
+
+    public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 }
