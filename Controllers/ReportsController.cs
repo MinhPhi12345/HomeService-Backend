@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace HomeService.Api.Controllers;
 // EP08 - Quản trị & Báo cáo (US31-US32)
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = Roles.Admin)]
 public class ReportsController : ControllerBase
 {
     private readonly AppDbContext _db;

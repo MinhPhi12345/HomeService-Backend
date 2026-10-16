@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -50,7 +51,7 @@ public class ReviewsController : ControllerBase
 
     // US27 - Admin xem & xử lý các đánh giá bị gắn cờ khiếu nại
     [HttpGet("flagged")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> GetFlagged()
     {
         var flagged = await _db.Reviews.Where(r => r.IsFlagged).ToListAsync();
@@ -58,7 +59,7 @@ public class ReviewsController : ControllerBase
     }
 
     [HttpPut("{id:int}/flag")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> ResolveFlag(int id, [FromQuery] bool clear = true)
     {
         var review = await _db.Reviews.FindAsync(id);

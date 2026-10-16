@@ -24,11 +24,14 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<MatchingService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<SettlementService>();
 builder.Services.AddScoped<OfferService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<BookingJobs>();
+builder.Services.AddScoped<CancellationService>();
 
 // --- Cấu hình nghiệp vụ (appsettings.json) ---
 builder.Services.Configure<BusinessOptions>(builder.Configuration.GetSection(BusinessOptions.Section));
@@ -58,6 +61,20 @@ builder.Services
             ValidAudience = jwtSection["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!)),
             ClockSkew = TimeSpan.FromMinutes(1),
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            // US06 / BR-A03: tài khoản bị khóa (hoặc đã xóa) thì mọi token cũ bị từ chối ở lần gọi kế tiếp → 401
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                          ?? context.Principal?.FindFirst("sub")?.Value;
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var active = int.TryParse(sub, out var userId)
+                             && await db.Users.AnyAsync(u => u.Id == userId && u.IsActive);
+                if (!active) context.Fail("Tài khoản không còn hoạt động.");
+            },
         };
     });
 

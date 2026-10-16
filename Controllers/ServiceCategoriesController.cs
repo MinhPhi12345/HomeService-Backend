@@ -51,7 +51,7 @@ public class ServiceCategoriesController : ControllerBase
 
     // US07 - Thêm danh mục dịch vụ (Admin) kèm giá cơ bản (US11)
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<ActionResult<ServiceCategoryResponse>> Create(UpsertServiceCategoryRequest request)
     {
         ValidatePrice(request.BasePrice);
@@ -73,7 +73,7 @@ public class ServiceCategoriesController : ControllerBase
     // US08 - Sửa danh mục dịch vụ (Admin) — cũng dùng để thiết lập bảng giá (US11).
     // FR-07: đổi basePrice chỉ áp dụng cho đơn tạo SAU thời điểm đổi (đơn cũ giữ nguyên totalPrice – BR-B01).
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Update(int id, UpsertServiceCategoryRequest request)
     {
         var entity = await _db.ServiceCategories.FindAsync(id);
@@ -93,7 +93,7 @@ public class ServiceCategoriesController : ControllerBase
 
     // US09 - Xóa danh mục dịch vụ (Admin) — soft delete (BR-S01)
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var entity = await _db.ServiceCategories.FindAsync(id);
