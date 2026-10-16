@@ -1,6 +1,7 @@
 using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.DTOs;
+using HomeService.Api.Enums;
 using HomeService.Api.Models;
 using HomeService.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -21,18 +22,27 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
     {
-        var exists = await _db.Users.AnyAsync(u => u.Email == request.Email);
+        // FR-01: không cho đăng ký Admin; chỉ nhận 0 (Customer) hoặc 1 (Tasker)
+        if (request.Role != UserRole.Customer && request.Role != UserRole.Tasker)
+            throw ApiException.BadRequest("Vai trò không hợp lệ.");
+
+        var email = NormalizeEmail(request.Email);   // BR-A01: email duy nhất, không phân biệt hoa thường
+        var exists = await _db.Users.AnyAsync(u => u.Email == email);
         if (exists)
             throw new InvalidOperationException("Email đã được sử dụng.");
 
         var user = new User
         {
-            FullName = request.FullName,
-            Email = request.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            PhoneNumber = request.PhoneNumber,
+            FullName = request.FullName.Trim(),
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // BR-A02
+            PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
             Role = request.Role,
         };
+
+        // FR-01 bước 5: Tasker được tạo sẵn hồ sơ ở trạng thái Pending (chờ gửi hồ sơ & duyệt – US04)
+        if (user.Role == UserRole.Tasker)
+            user.TaskerProfile = new TaskerProfile { VerificationStatus = TaskerVerificationStatus.Pending };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
