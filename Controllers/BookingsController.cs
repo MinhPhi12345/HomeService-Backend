@@ -1,8 +1,10 @@
-using System.Security.Claims;
 using HomeService.Api.Data;
 using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
+using HomeService.Api.Extensions;
 using HomeService.Api.Models;
+using HomeService.Api.Services;
+using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,65 +18,53 @@ namespace HomeService.Api.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IBookingService _bookingService;
 
-    public BookingsController(AppDbContext db)
+    public BookingsController(AppDbContext db, IBookingService bookingService)
     {
         _db = db;
+        _bookingService = bookingService;
     }
 
-    private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+    private int CurrentUserId => User.GetUserId();
 
-    // US12/US13 - Khách hàng tạo đơn đặt dịch vụ
+    // US12/US13 - Khách hàng tạo đơn đặt dịch vụ (chọn thời gian, địa chỉ có tọa độ, phương thức thanh toán)
     [HttpPost]
     [Authorize(Roles = "Customer")]
     public async Task<ActionResult<BookingResponse>> Create(CreateBookingRequest request)
     {
-        var service = await _db.ServiceCategories.FindAsync(request.ServiceCategoryId);
-        if (service is null || !service.IsActive) return BadRequest(new { message = "Dịch vụ không tồn tại." });
-
-        var booking = new Booking
-        {
-            CustomerId = CurrentUserId,
-            ServiceCategoryId = request.ServiceCategoryId,
-            ScheduledTime = request.ScheduledTime,
-            Address = request.Address,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
-            Note = request.Note,
-            TotalPrice = service.BasePrice, // TODO: tính theo số lượng/hệ số khi mở rộng
-            Status = BookingStatus.Pending,
-        };
-
-        _db.Bookings.Add(booking);
-        await _db.SaveChangesAsync();
-
-        // TODO (US16): gọi MatchingService để tự động ghép nối Tasker phù hợp theo khu vực/lịch rảnh/đánh giá
-
+        var booking = await _bookingService.CreateAsync(CurrentUserId, request);
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, await ToResponse(booking.Id));
     }
 
-    // US15 - Khách hàng xem lịch sử đặt dịch vụ / US20 - Tasker xem đơn đã nhận
+    // US15 - Khách hàng xem lịch sử đặt dịch vụ / US20 - Tasker xem đơn đã nhận (BE tự lọc theo vai trò trong token)
     [HttpGet("my")]
+    [Authorize(Roles = "Customer,Tasker")]
     public async Task<ActionResult<IEnumerable<BookingResponse>>> GetMine()
     {
-        var role = User.FindFirstValue(ClaimTypes.Role);
-        var query = _db.Bookings.AsQueryable();
-        query = role == "Tasker"
-            ? query.Where(b => b.TaskerId == CurrentUserId)
-            : query.Where(b => b.CustomerId == CurrentUserId);
+        var userId = CurrentUserId;
+        var query = BookingsWithDetails();
+        query = User.IsInRole(UserRole.Tasker)
+            ? query.Where(b => b.TaskerId == userId)
+            : query.Where(b => b.CustomerId == userId);
 
         var bookings = await query.OrderByDescending(b => b.CreatedAt).ToListAsync();
-        var result = new List<BookingResponse>();
-        foreach (var b in bookings) result.Add(await ToResponse(b.Id));
-        return Ok(result);
+        var now = DateTime.UtcNow;
+        return Ok(bookings.Select(b => BookingMapper.ToResponse(b, now)));
     }
 
+    // Chi tiết đơn – chỉ Khách hàng của đơn, Tasker của đơn hoặc Admin được xem (FR-11)
     [HttpGet("{id:int}")]
     public async Task<ActionResult<BookingResponse>> GetById(int id)
     {
-        var exists = await _db.Bookings.AnyAsync(b => b.Id == id);
-        if (!exists) return NotFound();
-        return Ok(await ToResponse(id));
+        var booking = await BookingsWithDetails().FirstOrDefaultAsync(b => b.Id == id);
+        if (booking is null) return NotFound();
+
+        var userId = CurrentUserId;
+        var allowed = User.IsInRole(UserRole.Admin) || booking.CustomerId == userId || booking.TaskerId == userId;
+        if (!allowed) return Forbid();
+
+        return Ok(BookingMapper.ToResponse(booking, DateTime.UtcNow));
     }
 
     // US17 - Tasker nhận / từ chối đơn
@@ -136,26 +126,16 @@ public class BookingsController : ControllerBase
         return NoContent();
     }
 
+    private IQueryable<Booking> BookingsWithDetails() => _db.Bookings
+        .AsNoTracking()
+        .Include(x => x.Customer)
+        .Include(x => x.Tasker)
+        .Include(x => x.ServiceCategory)
+        .Include(x => x.Payment);
+
     private async Task<BookingResponse> ToResponse(int id)
     {
-        var b = await _db.Bookings
-            .Include(x => x.Customer)
-            .Include(x => x.Tasker)
-            .Include(x => x.ServiceCategory)
-            .FirstAsync(x => x.Id == id);
-
-        return new BookingResponse(
-            b.Id,
-            b.ServiceCategory!.Name,
-            b.CustomerId,
-            b.Customer!.FullName,
-            b.TaskerId,
-            b.Tasker?.FullName,
-            b.ScheduledTime,
-            b.Address,
-            b.TotalPrice,
-            b.Status,
-            b.CreatedAt
-        );
+        var b = await BookingsWithDetails().FirstAsync(x => x.Id == id);
+        return BookingMapper.ToResponse(b, DateTime.UtcNow);
     }
 }
