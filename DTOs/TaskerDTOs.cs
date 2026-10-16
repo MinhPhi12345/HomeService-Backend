@@ -72,3 +72,16 @@ public record PendingTaskerItem(
 
 // Phần tử của GET /api/taskers/available
 public record AvailableTaskerItem(int UserId, string FullName, decimal RatingAverage, string? WorkingArea);
+
+// US16 – body của PUT /api/taskers/availability (SRS 9.5)
+public class UpdateAvailabilityRequest
+{
+    [Required(ErrorMessage = "Vui lòng chọn trạng thái nhận đơn.")]
+    public bool? IsAvailable { get; set; }
+
+    [Range(-90, 90, ErrorMessage = "Vị trí không hợp lệ.")]
+    public double? Latitude { get; set; }
+
+    [Range(-180, 180, ErrorMessage = "Vị trí không hợp lệ.")]
+    public double? Longitude { get; set; }
+}

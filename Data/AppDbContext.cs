@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<BookingOffer> BookingOffers => Set<BookingOffer>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -98,6 +99,20 @@ public class AppDbContext : DbContext
         {
             e.Property(b => b.Address).HasMaxLength(255);
             e.Property(b => b.Note).HasMaxLength(500);
+            e.Property(b => b.CommissionRate).HasPrecision(5, 4);
+            e.HasIndex(b => new { b.Status, b.NextMatchAt });
+            e.HasIndex(b => new { b.TaskerId, b.Status });
+        });
+
+        // US16 – lời mời nhận đơn
+        modelBuilder.Entity<BookingOffer>(e =>
+        {
+            e.HasOne(o => o.Booking).WithMany(b => b.Offers).HasForeignKey(o => o.BookingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(o => o.Tasker).WithMany().HasForeignKey(o => o.TaskerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(o => new { o.BookingId, o.TaskerId, o.Round }).IsUnique(); // không gửi lại cùng Tasker trong 1 vòng
+            e.HasIndex(o => new { o.TaskerId, o.Status });
+            e.Property(o => o.DistanceKm).HasPrecision(6, 2);
+            e.Property(o => o.Score).HasPrecision(5, 4);
         });
 
         modelBuilder.Entity<Payment>()

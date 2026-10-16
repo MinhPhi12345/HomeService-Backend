@@ -2,6 +2,7 @@ using System.Text;
 using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.Middleware;
+using HomeService.Api.Options;
 using HomeService.Api.Services;
 using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -21,6 +22,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<MatchingService>();
+
+// --- Cấu hình nghiệp vụ (appsettings.json) ---
+builder.Services.Configure<BusinessOptions>(builder.Configuration.GetSection(BusinessOptions.Section));
+builder.Services.Configure<MatchingOptions>(builder.Configuration.GetSection(MatchingOptions.Section));
+builder.Services.Configure<SettlementOptions>(builder.Configuration.GetSection(SettlementOptions.Section));
+
+// --- Tác vụ nền: ghép nối theo đợt, hết hạn thanh toán, tự xác nhận... ---
+builder.Services.AddHostedService<BookingWorker>();
 
 // --- Authentication (JWT) ---
 var jwtSection = builder.Configuration.GetSection("Jwt");

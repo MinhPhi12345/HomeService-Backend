@@ -55,6 +55,7 @@ public class ServiceCategoriesController : ControllerBase
     public async Task<ActionResult<ServiceCategoryResponse>> Create(UpsertServiceCategoryRequest request)
     {
         ValidatePrice(request.BasePrice);
+        await EnsureUniqueNameAsync(request.Name, null);
 
         var entity = new ServiceCategory
         {
@@ -78,6 +79,7 @@ public class ServiceCategoriesController : ControllerBase
         var entity = await _db.ServiceCategories.FindAsync(id);
         if (entity is null) return NotFound();
         ValidatePrice(request.BasePrice);
+        await EnsureUniqueNameAsync(request.Name, id);
 
         entity.Name = request.Name.Trim();
         entity.Description = NullIfEmpty(request.Description);
@@ -100,6 +102,15 @@ public class ServiceCategoriesController : ControllerBase
         entity.IsActive = false;
         await _db.SaveChangesAsync();
         return NoContent();
+    }
+
+    // US08 – không để 2 dịch vụ đang hoạt động trùng tên (tránh khách chọn nhầm)
+    private async Task EnsureUniqueNameAsync(string name, int? exceptId)
+    {
+        var normalized = name.Trim().ToLower();
+        var duplicated = await _db.ServiceCategories.AnyAsync(s =>
+            s.IsActive && s.Name.ToLower() == normalized && (exceptId == null || s.Id != exceptId));
+        if (duplicated) throw ApiException.Conflict("Tên dịch vụ đã tồn tại.");
     }
 
     private static void ValidatePrice(decimal price)

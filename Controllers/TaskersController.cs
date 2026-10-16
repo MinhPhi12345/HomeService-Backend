@@ -124,6 +124,26 @@ public class TaskersController : ControllerBase
         return NoContent();
     }
 
+    // US16 - Tasker bật/tắt nhận đơn; app gửi vị trí hiện tại 1 lần khi bật (không theo dõi GPS chạy ngầm – BR-M06)
+    [HttpPut("availability")]
+    [Authorize(Roles = "Tasker")]
+    public async Task<IActionResult> UpdateAvailability(UpdateAvailabilityRequest request)
+    {
+        var userId = User.GetUserId();
+        var profile = await _db.TaskerProfiles.FirstOrDefaultAsync(t => t.UserId == userId);
+        if (profile is null) return NotFound();
+
+        profile.IsAvailable = request.IsAvailable!.Value;
+        if (request.Latitude is not null && request.Longitude is not null)
+        {
+            profile.LastLatitude = request.Latitude;
+            profile.LastLongitude = request.Longitude;
+            profile.LastLocationAt = DateTime.UtcNow;
+        }
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // US16 - Gợi ý danh sách Tasker đã duyệt theo khu vực (ghép nối tự động dùng tọa độ – MatchingService)
     [HttpGet("available")]
     public async Task<ActionResult<IEnumerable<AvailableTaskerItem>>> GetAvailable([FromQuery] string? area)

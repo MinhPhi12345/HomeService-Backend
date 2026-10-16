@@ -35,11 +35,21 @@ namespace HomeService.Api.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<decimal>("CommissionRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("CurrentWave")
+                        .HasColumnType("int");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("CustomerPresent")
+                        .HasColumnType("bit");
 
                     b.Property<double?>("Latitude")
                         .HasColumnType("float");
@@ -47,9 +57,24 @@ namespace HomeService.Api.Migrations
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
 
+                    b.Property<int>("MatchRound")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("NextMatchAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Note")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("PaymentDueAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("ScheduledTime")
                         .HasColumnType("datetime2");
@@ -76,9 +101,61 @@ namespace HomeService.Api.Migrations
 
                     b.HasIndex("ServiceCategoryId");
 
-                    b.HasIndex("TaskerId");
+                    b.HasIndex("Status", "NextMatchAt");
+
+                    b.HasIndex("TaskerId", "Status");
 
                     b.ToTable("Bookings");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.BookingOffer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DistanceKm")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Score")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TaskerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Wave")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskerId", "Status");
+
+                    b.HasIndex("BookingId", "TaskerId", "Round")
+                        .IsUnique();
+
+                    b.ToTable("BookingOffers");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.Notification", b =>
@@ -271,6 +348,15 @@ namespace HomeService.Api.Migrations
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
 
+                    b.Property<double?>("LastLatitude")
+                        .HasColumnType("float");
+
+                    b.Property<DateTime?>("LastLocationAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<double?>("LastLongitude")
+                        .HasColumnType("float");
+
                     b.Property<decimal>("RatingAverage")
                         .HasPrecision(3, 2)
                         .HasColumnType("decimal(3,2)");
@@ -339,6 +425,13 @@ namespace HomeService.Api.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsCashBlocked")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("OutstandingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -350,6 +443,9 @@ namespace HomeService.Api.Migrations
                         .HasColumnType("varchar(15)");
 
                     b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnpaidReportCount")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -382,6 +478,25 @@ namespace HomeService.Api.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("ServiceCategory");
+
+                    b.Navigation("Tasker");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.BookingOffer", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.Booking", "Booking")
+                        .WithMany("Offers")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeService.Api.Models.User", "Tasker")
+                        .WithMany()
+                        .HasForeignKey("TaskerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
 
                     b.Navigation("Tasker");
                 });
@@ -448,6 +563,8 @@ namespace HomeService.Api.Migrations
 
             modelBuilder.Entity("HomeService.Api.Models.Booking", b =>
                 {
+                    b.Navigation("Offers");
+
                     b.Navigation("Payment");
 
                     b.Navigation("Reviews");
