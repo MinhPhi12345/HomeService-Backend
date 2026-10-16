@@ -11,5 +11,18 @@ public class SettlementOptions
     public int AutoConfirmHours { get; set; } = 24;
     public int ReminderHoursBefore { get; set; } = 2;
     /// <summary>Báo Tasker khi số dư ví sau khi trừ chiết khấu thấp hơn mức này (FR-21).</summary>
+    // US14 – phí hủy (BR-C01)
+    public double LateCancelHours { get; set; } = 2;
+    public decimal LateCancelFeePercent { get; set; } = 20;
+    public decimal ArrivedCancelFeePercent { get; set; } = 50;
+    public double ArrivedDistanceMeters { get; set; } = 200;
+    public int ArrivedLocationFreshMinutes { get; set; } = 30;
+
+    // US35 – khiếu nại & vi phạm (BR-D01, BR-D02)
+    public int DisputeHours { get; set; } = 24;
+    public int TaskerResponseHours { get; set; } = 24;
+    public int ViolationPointsToSuspend { get; set; } = 3;
+    public int SuspendDays { get; set; } = 7;
+
     public decimal LowBalanceThreshold { get; set; } = 50_000m;
 }
