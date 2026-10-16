@@ -28,5 +28,10 @@ public class TaskerProfile
     public int ServiceRadiusKm { get; set; } = 5; // 3, 5 hoặc 8
 
     public bool IsAvailable { get; set; } = true; // Tasker đang bật nhận đơn
+
+    // US16 – vị trí hiện tại app gửi khi bật nhận đơn; quá 60 phút thì dùng điểm làm việc (BR-M06)
+    public double? LastLatitude { get; set; }
+    public double? LastLongitude { get; set; }
+    public DateTime? LastLocationAt { get; set; }
     public DateTime? SubmittedAt { get; set; } // lần gửi hồ sơ gần nhất (để Admin sắp xếp danh sách chờ duyệt)
 }
