@@ -32,6 +32,9 @@ services:
       Jwt__Key: "${JWT_KEY:-CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS}"
     ports:
       - "8080:8080"
+    volumes:
+      - uploads_data:/app/wwwroot/uploads   # giữ ảnh đã tải lên khi build lại container
 
 volumes:
   sqlserver_data:
+  uploads_data:
