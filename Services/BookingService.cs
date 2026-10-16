@@ -19,11 +19,13 @@ public class BookingService : IBookingService
     private readonly SettlementOptions _settlement;
     private readonly SettlementService _settlementService;
     private readonly WalletService _wallet;
+    private readonly MatchingOptions _matching;
 
     public BookingService(AppDbContext db, INotificationService notifications,
         IOptions<BusinessOptions> business, IOptions<SettlementOptions> settlement,
-        SettlementService settlementService, WalletService wallet)
+        SettlementService settlementService, WalletService wallet, IOptions<MatchingOptions> matching)
     {
+        _matching = matching.Value;
         _db = db;
         _notifications = notifications;
         _business = business.Value;
@@ -204,5 +206,30 @@ public class BookingService : IBookingService
         booking.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
+    }
+
+    // US33 – Khách chọn Thử lại (có thể đổi giờ) khi đơn "Chưa có Tasker nhận" (FR-24)
+    public async Task RetryAsync(int bookingId, int customerId, RetryBookingRequest? request)
+    {
+        var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId)
+                      ?? throw ApiException.NotFound();
+        if (booking.CustomerId != customerId) throw ApiException.Forbidden();
+        if (booking.Status != BookingStatus.NoTaskerFound)
+            throw ApiException.BadRequest("Đơn không ở trạng thái chờ thử lại.");
+        if (booking.MatchRound >= _matching.MaxRounds)
+            throw ApiException.BadRequest("Đã vượt quá số lần thử lại.");
+
+        if (request?.ScheduledTime is not null)
+            booking.ScheduledTime = ValidateScheduledTime(request.ScheduledTime.Value);
+        else if (booking.ScheduledTime <= DateTime.UtcNow)
+            throw ApiException.BadRequest("Thời gian đặt không hợp lệ.");
+
+        // Vòng mới: chạy lại từ đợt 1; Tasker đã được mời ở vòng trước được xét lại
+        booking.MatchRound += 1;
+        booking.CurrentWave = 0;
+        booking.NextMatchAt = null;
+        booking.Status = BookingStatus.Pending;
+        booking.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
     }
 }
