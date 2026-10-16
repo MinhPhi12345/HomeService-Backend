@@ -118,6 +118,9 @@ namespace HomeService.Api.Migrations
                     b.Property<bool>("IsAutoConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsTaskerNoShow")
+                        .HasColumnType("bit");
+
                     b.Property<double?>("Latitude")
                         .HasColumnType("float");
 
@@ -128,6 +131,9 @@ namespace HomeService.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("NextMatchAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("NoShowAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Note")
