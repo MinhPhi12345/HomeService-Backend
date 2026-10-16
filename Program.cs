@@ -1,4 +1,5 @@
 using System.Text;
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.Middleware;
 using HomeService.Api.Services;
@@ -6,6 +7,9 @@ using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+
+// Thư mục lưu ảnh tải lên (POST /api/uploads) – tạo trước để UseStaticFiles phục vụ được
+Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +20,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // --- Dependency Injection ---
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // --- Authentication (JWT) ---
 var jwtSection = builder.Configuration.GetSection("Jwt");
@@ -36,6 +41,7 @@ builder.Services
             ValidIssuer = jwtSection["Issuer"],
             ValidAudience = jwtSection["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!)),
+            ClockSkew = TimeSpan.FromMinutes(1),
         };
     });
 
@@ -53,7 +59,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Encoder = JsonDefaults.Encoder); // giữ tiếng Việt có dấu
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -75,6 +82,9 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Tự áp dụng migration + tạo tài khoản Admin mặc định
+await DbInitializer.InitializeAsync(app.Services);
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -84,6 +94,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // phục vụ ảnh đã tải lên: /uploads/...
 app.UseCors("Default");
 app.UseAuthentication();
 app.UseAuthorization();
