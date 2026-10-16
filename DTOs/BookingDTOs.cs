@@ -94,3 +94,15 @@ public class BookingResponse
 
 // US14 – GET /api/bookings/{id}/cancellation-fee
 public record CancellationFeeResponse(decimal CancellationFee, decimal RefundAmount, string Reason);
+
+// US36 – body của POST /api/bookings/{id}/report-unpaid
+public class ReportUnpaidRequest
+{
+    [Required(ErrorMessage = "Vui lòng mô tả tình huống (10–500 ký tự).")]
+    [StringLength(500, MinimumLength = 10, ErrorMessage = "Vui lòng mô tả tình huống (10–500 ký tự).")]
+    public string Note { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Vui lòng chụp ảnh hiện trạng.")]
+    [MaxLength(500)]
+    public string PhotoUrl { get; set; } = string.Empty;
+}

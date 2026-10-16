@@ -20,11 +20,14 @@ public class BookingService : IBookingService
     private readonly SettlementService _settlementService;
     private readonly WalletService _wallet;
     private readonly MatchingOptions _matching;
+    private readonly AuditService _audit;
 
     public BookingService(AppDbContext db, INotificationService notifications,
         IOptions<BusinessOptions> business, IOptions<SettlementOptions> settlement,
-        SettlementService settlementService, WalletService wallet, IOptions<MatchingOptions> matching)
+        SettlementService settlementService, WalletService wallet, IOptions<MatchingOptions> matching,
+        AuditService audit)
     {
+        _audit = audit;
         _matching = matching.Value;
         _db = db;
         _notifications = notifications;
@@ -248,6 +251,39 @@ public class BookingService : IBookingService
             _notifications.Add(oldTasker.Value, "Đơn đã được chuyển cho Tasker khác",
                 $"Đơn #{booking.Id} đã được chuyển cho Tasker khác vì bạn không đến đúng hẹn.");
         await _db.SaveChangesAsync();
+    }
+
+    // US36 – Tasker làm xong nhưng khách không trả tiền mặt (FR-27): đơn → 13, khách bị ghi nợ, Tasker không bị trừ chiết khấu
+    public async Task ReportUnpaidAsync(int bookingId, int taskerId, ReportUnpaidRequest request)
+    {
+        var booking = await _db.Bookings.Include(b => b.Payment).FirstOrDefaultAsync(b => b.Id == bookingId)
+                      ?? throw ApiException.NotFound();
+        if (booking.TaskerId != taskerId) throw ApiException.Forbidden();
+        if (booking.PaymentMethod != PaymentMethod.Cash || booking.Status != BookingStatus.InProgress || booking.Payment is not null)
+            throw ApiException.BadRequest("Chỉ báo được với đơn tiền mặt đang thực hiện.");
+
+        var now = DateTime.UtcNow;
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        booking.Status = BookingStatus.PaymentOverdue;
+        booking.CheckOutPhotoUrl = request.PhotoUrl.Trim();
+        booking.CompletedAt = now; // mốc 24 giờ để khách khiếu nại nếu cho rằng đã trả
+        booking.UpdatedAt = now;
+
+        var customer = await _db.Users.FirstAsync(u => u.Id == booking.CustomerId);
+        customer.OutstandingAmount += booking.TotalPrice;
+        customer.UnpaidReportCount += 1;
+        if (customer.UnpaidReportCount >= 2) customer.IsCashBlocked = true; // BR-U01: từ lần thứ 2 chỉ được trả online
+
+        _audit.Add(AuditService.Debt, booking.TotalPrice, booking.Id, null,
+            $"Tasker #{taskerId} báo khách chưa thanh toán tiền mặt: {request.Note.Trim()}");
+        _notifications.Add(booking.CustomerId, "Bạn có khoản cần thanh toán",
+            $"Tasker báo đơn #{booking.Id} chưa được thanh toán {MoneyFormat.Vnd(booking.TotalPrice)}. " +
+            "Vui lòng thanh toán online để tiếp tục đặt dịch vụ. Nếu bạn đã trả, hãy khiếu nại trong 24 giờ.");
+
+        await _db.SaveChangesAsync();
+        await _wallet.RecalculateReservedAsync(taskerId); // giải phóng phần tạm giữ, không trừ chiết khấu
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
     }
 
     private static DateTime RoundUpToFiveMinutes(DateTime utc)
