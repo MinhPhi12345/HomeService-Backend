@@ -1,0 +1,3944 @@
+{
+  "info": {
+    "name": "HomeService API – Nhóm 15",
+    "_postman_id": "5f3c2d1e-7a8b-4c9d-9e0f-homeservice15",
+    "description": "Bộ request kiểm thử Backend HomeService theo từng Sprint/User Story (SRS v1.3).\n\n**Cách dùng:** chọn collection → Run (Collection Runner) chạy lần lượt từ Sprint 1 đến Sprint 7, hoặc bấm Send từng request theo thứ tự. Token và các id (bookingId, disputeId...) được lưu tự động vào biến của collection.\n\nĐổi `baseUrl` trong tab Variables nếu Backend không chạy ở http://localhost:8080.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Sprint 1 – Tài khoản & danh mục dịch vụ",
+      "item": [
+        {
+          "name": "US02 Đăng nhập Admin (tài khoản tạo sẵn)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@homeservice.vn\",\n  \"password\": \"Admin@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần chạy dùng 1 vị trí ngẫu nhiên để Tasker của lần chạy trước không \"giành\" lời mời",
+                  "const lat = 10.70 + Math.random() * 0.15;",
+                  "pm.collectionVariables.set(\"jobLat\", lat.toFixed(6));",
+                  "pm.collectionVariables.set(\"t1Lat\", (lat + 1 / 111).toFixed(6));",
+                  "pm.collectionVariables.set(\"t15Lat\", (lat + 1.5 / 111).toFixed(6));",
+                  "pm.collectionVariables.set(\"nearLat\", (lat + 0.3 / 111).toFixed(6));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"adminToken\", j.accessToken);",
+                  "pm.test(\"role = 2 (Admin)\", function () { pm.expect(j.role).to.eql(2); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US01 Đăng ký Khách hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"Abc12345\",\n  \"phoneNumber\": \"0901234567\",\n  \"role\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = Math.floor(Math.random() * 1e8);",
+                  "pm.collectionVariables.set(\"customerEmail\", \"khach\" + r + \"@test.vn\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"customerToken\", j.accessToken);",
+                  "pm.collectionVariables.set(\"customerId\", j.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US01 Đăng ký trùng email → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"Abc12345\",\n  \"role\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"message: Email đã được sử dụng.\", function () { pm.expect(pm.response.json().message).to.eql(\"Email đã được sử dụng.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US01 Đăng ký role Admin → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Hacker\",\n  \"email\": \"hack{{$randomInt}}@test.vn\",\n  \"password\": \"Abc12345\",\n  \"role\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Vai trò không hợp lệ.\", function () { pm.expect(pm.response.json().message).to.eql(\"Vai trò không hợp lệ.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US01 Đăng ký Tasker 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Trần Thị Tasker\",\n  \"email\": \"{{taskerEmail}}\",\n  \"password\": \"Abc12345\",\n  \"phoneNumber\": \"0909000001\",\n  \"role\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = Math.floor(Math.random() * 1e8);",
+                  "pm.collectionVariables.set(\"taskerEmail\", \"tasker\" + r + \"@test.vn\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"taskerToken\", j.accessToken);",
+                  "pm.collectionVariables.set(\"taskerId\", j.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US01 Đăng ký Tasker 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Lê Văn Tasker Hai\",\n  \"email\": \"{{tasker2Email}}\",\n  \"password\": \"Abc12345\",\n  \"phoneNumber\": \"0909000002\",\n  \"role\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = Math.floor(Math.random() * 1e8);",
+                  "pm.collectionVariables.set(\"tasker2Email\", \"tasker2_\" + r + \"@test.vn\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"tasker2Token\", j.accessToken);",
+                  "pm.collectionVariables.set(\"tasker2Id\", j.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US02 Đăng nhập Khách hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"Abc12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"customerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US02 Đăng nhập sai mật khẩu → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"SaiMatKhau1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"message: Email hoặc mật khẩu không đúng.\", function () { pm.expect(pm.response.json().message).to.eql(\"Email hoặc mật khẩu không đúng.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Tải ảnh lên (CCCD / check-in / check-out)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/uploads",
+            "description": "Ở tab Body → form-data, chọn file ảnh JPG/PNG ≤ 5 MB cho field **file**. Nếu bỏ qua bước này, biến photoUrl giữ giá trị mẫu và các bước sau vẫn chạy được.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "sample.png",
+                  "description": "Chọn 1 ảnh JPG/PNG ≤ 5 MB trên máy bạn"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { pm.collectionVariables.set(\"photoUrl\", pm.response.json().url); }",
+                  "pm.test(\"HTTP 201 (hoặc bỏ qua nếu chưa chọn file)\", function () { pm.expect([201, 400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Tasker 1 gửi hồ sơ (cách địa chỉ đơn ~1 km)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCardNumber\": \"079123456789\",\n  \"idCardImageUrl\": \"{{photoUrl}}\",\n  \"skills\": \"Dọn dẹp, Giặt ủi\",\n  \"workingArea\": \"Quận 1\",\n  \"baseAddress\": \"25 Lê Lợi, Q.1\",\n  \"baseLatitude\": {{t1Lat}},\n  \"baseLongitude\": 106.7009,\n  \"serviceRadiusKm\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"taskerProfileId\", j.id);",
+                  "pm.test(\"Chờ duyệt (verificationStatus = 0)\", function () { pm.expect(j.verificationStatus).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Bán kính 4 km → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCardNumber\": \"079123456789\",\n  \"skills\": \"Dọn dẹp\",\n  \"workingArea\": \"Quận 1\",\n  \"baseAddress\": \"25 Lê Lợi, Q.1\",\n  \"baseLatitude\": {{t1Lat}},\n  \"baseLongitude\": 106.7009,\n  \"serviceRadiusKm\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Bán kính phục vụ không hợp lệ.\", function () { pm.expect(pm.response.json().message).to.eql(\"Bán kính phục vụ không hợp lệ.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Tasker 2 gửi hồ sơ (~1,5 km)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tasker2Token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idCardNumber\": \"079123456780\",\n  \"skills\": \"Dọn dẹp nhà\",\n  \"workingArea\": \"Quận 1\",\n  \"baseAddress\": \"50 Pasteur, Q.1\",\n  \"baseLatitude\": {{t15Lat}},\n  \"baseLongitude\": 106.7009,\n  \"serviceRadiusKm\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"tasker2ProfileId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Tasker xem hồ sơ của mình",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/profile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Admin xem hồ sơ chờ duyệt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/pending-verification"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Có Tasker vừa gửi\", function () { pm.expect(j.map(x => x.id)).to.include(Number(pm.collectionVariables.get(\"taskerProfileId\"))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Admin duyệt Tasker 1",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/{{taskerProfileId}}/verification?approve=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Admin duyệt Tasker 2",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/{{tasker2ProfileId}}/verification?approve=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US04 Khách gọi API duyệt → 403",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/{{taskerProfileId}}/verification?approve=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US10 Xem danh sách dịch vụ (không cần đăng nhập)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/servicecategories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "const s = j.find(x => x.name === \"Dọn dẹp nhà\") || j[0];",
+                  "pm.collectionVariables.set(\"serviceId\", s.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US10 Tìm kiếm dịch vụ 'dọn'",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/servicecategories?keyword=dọn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Chỉ dịch vụ chứa 'dọn'\", function () { j.forEach(x => pm.expect(x.name.toLowerCase()).to.include(\"dọn\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US07 Admin thêm dịch vụ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vệ sinh máy lạnh {{$randomInt}}\",\n  \"description\": \"Vệ sinh, bơm gas máy lạnh\",\n  \"basePrice\": 250000,\n  \"unit\": \"lần\",\n  \"iconUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"newServiceId\", j.id);",
+                  "pm.collectionVariables.set(\"newServiceName\", j.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US07 Đơn vị tính sai → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dịch vụ lỗi\",\n  \"description\": null,\n  \"basePrice\": 100000,\n  \"unit\": \"kg\",\n  \"iconUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US07 Khách thêm dịch vụ → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Không được\",\n  \"description\": null,\n  \"basePrice\": 100000,\n  \"unit\": \"lần\",\n  \"iconUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US11 Admin thiết lập giá (PUT gửi đủ field)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories/{{newServiceId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{newServiceName}}\",\n  \"description\": \"Vệ sinh, bơm gas máy lạnh\",\n  \"basePrice\": 300000,\n  \"unit\": \"lần\",\n  \"iconUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US03 Đăng xuất",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sprint 2 – Đặt đơn & ghép nối theo đợt",
+      "item": [
+        {
+          "name": "US16 Tasker 1 bật nhận đơn + gửi vị trí hiện tại",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/availability",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true,\n  \"latitude\": {{t1Lat}},\n  \"longitude\": 106.7009\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US16 Tasker 2 bật nhận đơn (không gửi vị trí → dùng điểm làm việc)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tasker2Token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/taskers/availability",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US12 US13 Khách tạo đơn online (mặc định) → 10 Chờ thanh toán",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t3h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"t3h\", new Date(Date.now() + 3 * 3600 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"bookingId\", j.id);",
+                  "pm.test(\"status 10, có hạn thanh toán\", function () { pm.expect(j.status).to.eql(10); pm.expect(j.paymentDueAt).to.be.a(\"string\"); });",
+                  "pm.test(\"totalPrice = basePrice × quantity\", function () { pm.expect(j.totalPrice).to.eql(300000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US13 Giờ hẹn dưới 1 tiếng → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t0.5h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"t0.5h\", new Date(Date.now() + 0.5 * 3600 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Thời gian đặt không hợp lệ.\", function () { pm.expect(pm.response.json().message).to.eql(\"Thời gian đặt không hợp lệ.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US13 Thiếu tọa độ → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t3h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Thiếu vị trí thực hiện.\", function () { pm.expect(pm.response.json().message).to.eql(\"Thiếu vị trí thực hiện.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US12 Khách mới chọn tiền mặt → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t3h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 2,\n  \"paymentMethod\": 0,\n  \"customerPresent\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Đơn này chỉ hỗ trợ thanh toán online.\", function () { pm.expect(pm.response.json().message).to.eql(\"Đơn này chỉ hỗ trợ thanh toán online.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US12 Xem chi tiết đơn",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US16 Tasker xem lời mời (chưa có vì đơn chưa thanh toán)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/offers/my",
+            "description": "Ghép nối chỉ chạy khi đơn đã thanh toán trước (status 0). API thanh toán thuộc Sprint 3 (US21) – xem folder Sprint 3. Nếu đang test riêng nhánh Sprint 2: chạy SQL `UPDATE Bookings SET Status = 0 WHERE Id = <bookingId>` rồi gọi lại API này sau ~5 giây."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US08 Admin sửa dịch vụ trùng tên → 409",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories/{{newServiceId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dọn dẹp nhà\",\n  \"description\": null,\n  \"basePrice\": 300000,\n  \"unit\": \"lần\",\n  \"iconUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"message: Tên dịch vụ đã tồn tại.\", function () { pm.expect(pm.response.json().message).to.eql(\"Tên dịch vụ đã tồn tại.\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sprint 3 – Nhận đơn, thanh toán trước, xác nhận hoàn thành",
+      "item": [
+        {
+          "name": "US21 Thanh toán sai phương thức → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{bookingId}},\n  \"method\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Phương thức thanh toán không khớp đơn.\", function () { pm.expect(pm.response.json().message).to.eql(\"Phương thức thanh toán không khớp đơn.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US21 Thanh toán trước (ví điện tử – mô phỏng)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{bookingId}},\n  \"method\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Tiền đang tạm giữ (status 3 Held)\", function () { pm.expect(j.status).to.eql(3); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US16 Chờ ghép nối (~7 giây) rồi xem đơn → 1 Matched",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Chờ BackgroundService ghép nối (chạy mỗi 5 giây)",
+                  "setTimeout(function () {}, 7000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"status 1, đợt 1\", function () { pm.expect(j.status).to.eql(1); pm.expect(j.currentWave).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US17 Tasker 1 xem lời mời đang chờ",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/offers/my"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "const o = j.find(x => x.bookingId == pm.collectionVariables.get(\"bookingId\"));",
+                  "pm.test(\"Có lời mời của đơn\", function () { pm.expect(o).to.be.an(\"object\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US17 Tasker 1 nhận đơn (người nhận đầu tiên thắng)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US17 Tasker 2 nhận sau → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tasker2Token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"message: Đơn đã được Tasker khác nhận.\", function () { pm.expect(pm.response.json().message).to.eql(\"Đơn đã được Tasker khác nhận.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US18 Hoàn thành khi chưa bắt đầu → 400",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 4,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Chuyển trạng thái không hợp lệ.\", function () { pm.expect(pm.response.json().message).to.eql(\"Chuyển trạng thái không hợp lệ.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US18 Bắt đầu thiếu ảnh → 400",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Vui lòng chụp ảnh hiện trạng.\", function () { pm.expect(pm.response.json().message).to.eql(\"Vui lòng chụp ảnh hiện trạng.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US18 Tasker bắt đầu (3) kèm ảnh check-in",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 3,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US18 Tasker hoàn thành (4) kèm ảnh check-out",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 4,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US34 Khách xem đơn: chờ xác nhận, có hạn tự xác nhận",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"status 4, có autoConfirmAt, canDispute\", function () { pm.expect(j.status).to.eql(4); pm.expect(j.autoConfirmAt).to.be.a(\"string\"); pm.expect(j.canDispute).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US34 Khách xác nhận hoàn thành → giải ngân",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/confirm"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US34 Xem đơn → 5 Paid, Payment 4 Released",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{bookingId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Đã hoàn tất thanh toán\", function () { pm.expect(j.status).to.eql(5); pm.expect(j.paymentStatus).to.eql(4); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sprint 4 – Hoa hồng, vị trí, phân quyền, thông báo",
+      "item": [
+        {
+          "name": "US22 Tasker xem ví: +240.000 (300.000 − 20%)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Số dư ≥ 240.000\", function () { pm.expect(j.balance).to.be.at.least(240000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US19 Đơn 2: khách tạo đơn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t6h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"t6h\", new Date(Date.now() + 6 * 3600 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"booking2Id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US19 Đơn 2: thanh toán",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "description": "Đơn tạo với paymentMethod mặc định 1 nên trả bằng thẻ (2) bị từ chối – request kế tiếp trả đúng phương thức.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{booking2Id}},\n  \"method\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Phương thức thanh toán không khớp đơn.\", function () { pm.expect(pm.response.json().message).to.eql(\"Phương thức thanh toán không khớp đơn.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US19 Đơn 2: thanh toán đúng phương thức",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{booking2Id}},\n  \"method\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US19 Đơn 2: chờ ghép nối rồi Tasker 1 nhận",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking2Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Chờ BackgroundService ghép nối (chạy mỗi 5 giây)",
+                  "setTimeout(function () {}, 7000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US19 Tasker gửi vị trí",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking2Id}}/location",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": {{nearLat}},\n  \"longitude\": 106.7009\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US19 Khách xem vị trí Tasker",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking2Id}}/location"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Có tọa độ & khoảng cách\", function () { pm.expect(j.latitude).to.be.a(\"number\"); pm.expect(j.distanceKm).to.be.below(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US33 Thử lại đơn không ở trạng thái 8 → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking2Id}}/retry",
+            "description": "Để thấy trạng thái 8 (Chưa có Tasker nhận): tắt nhận đơn ở cả 2 Tasker (PUT /taskers/availability isAvailable=false), tạo đơn giờ hẹn sau 1,5 giờ và thanh toán, chờ ~2,5 phút (3 đợt 45/45/60 giây) rồi gọi retry hoặc cancel."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Đơn không ở trạng thái chờ thử lại.\", function () { pm.expect(pm.response.json().message).to.eql(\"Đơn không ở trạng thái chờ thử lại.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US06 Khách gọi API Admin → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US06 Không có token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/bookings/my"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US28 Tasker xem thông báo (phân trang)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications/my?page=1&pageSize=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"notificationId\", j.items[0].id);",
+                  "pm.test(\"Có thông báo 'Bạn có đơn mới'\", function () { pm.expect(j.items.map(x => x.title)).to.include(\"Bạn có đơn mới\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US28 Đánh dấu 1 thông báo đã đọc",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications/{{notificationId}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US28 Đánh dấu tất cả đã đọc",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications/read-all"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sprint 5 – Quản trị người dùng, hủy đơn, khiếu nại",
+      "item": [
+        {
+          "name": "US30 Admin xem danh sách Tasker",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/users?role=Tasker"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US30 Admin khóa Tasker 2",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/users/{{tasker2Id}}/active-status?isActive=false"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US30 Tasker 2 bị khóa đăng nhập → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{tasker2Email}}\",\n  \"password\": \"Abc12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"message: Tài khoản đã bị khóa.\", function () { pm.expect(pm.response.json().message).to.eql(\"Tài khoản đã bị khóa.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US30 Admin mở khóa Tasker 2",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/users/{{tasker2Id}}/active-status?isActive=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US20 Tasker xem đơn sắp làm (?upcoming=true)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/my?upcoming=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Có đơn 2, thấy SĐT khách\", function () { const b = j.find(x => x.id == pm.collectionVariables.get(\"booking2Id\")); pm.expect(b.customerPhone).to.eql(\"0901234567\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US14 Xem trước phí hủy đơn 2 (còn ≥ 2 giờ → miễn phí)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking2Id}}/cancellation-fee"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Phí 0, hoàn 100%\", function () { pm.expect(j.cancellationFee).to.eql(0); pm.expect(j.refundAmount).to.eql(300000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US14 Khách hủy đơn 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking2Id}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US25 Khách đánh giá Tasker (đơn 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{bookingId}},\n  \"revieweeId\": {{taskerId}},\n  \"rating\": 4,\n  \"comment\": \"Làm sạch sẽ, đúng giờ\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"reviewId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US25 Đánh giá lại → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{bookingId}},\n  \"revieweeId\": {{taskerId}},\n  \"rating\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"message: Bạn đã đánh giá đơn này rồi.\", function () { pm.expect(pm.response.json().message).to.eql(\"Bạn đã đánh giá đơn này rồi.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Đơn 3: Khách tạo đơn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t9h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"t9h\", new Date(Date.now() + 9 * 3600 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"booking3Id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Đơn 3: Khách thanh toán trước",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{booking3Id}},\n  \"method\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Đơn 3: Chờ ghép nối rồi xem đơn",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking3Id}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Chờ BackgroundService ghép nối (chạy mỗi 5 giây)",
+                  "setTimeout(function () {}, 7000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Đã gửi lời mời (status 1)\", function () { pm.expect(j.status).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Đơn 3: Tasker nhận đơn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking3Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Đơn 3: Tasker bắt đầu (3)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking3Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 3,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Đơn 3: Tasker hoàn thành (4)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking3Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 4,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Khách khiếu nại (trong 24 giờ, kèm ảnh)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking3Id}}/dispute",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": 1,\n  \"description\": \"Còn thiếu hạng mục lau nhà tắm\",\n  \"evidenceUrls\": [\n    \"{{photoUrl}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"disputeId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Tasker phản hồi khiếu nại",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/disputes/{{disputeId}}/respond",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"Nhà tắm khách khóa nên không vào được\",\n  \"evidenceUrls\": [\n    \"{{photoUrl}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Admin xem khiếu nại chờ xử lý",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/disputes?status=0"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Admin hoàn 30% (135.000 / 450.000)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/disputes/{{disputeId}}/resolve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": 1,\n  \"refundAmount\": 135000,\n  \"redoScheduledTime\": null,\n  \"adminNote\": \"Đối chiếu ảnh: thiếu hạng mục nhà tắm\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US35 Xem đơn 3 → 5 Paid, Payment 6 PartiallyRefunded",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking3Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Đã xử lý\", function () { pm.expect(j.status).to.eql(5); pm.expect(j.paymentStatus).to.eql(6); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sprint 6 – Chức năng phụ trợ",
+      "item": [
+        {
+          "name": "US23 Tasker xem ví",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US23 Nạp 200.000",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet/topup",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 200000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US23 Nạp dưới 50.000 → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet/topup",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US23 Rút 50.000",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet/withdraw",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US23 Rút quá số dư khả dụng → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet/withdraw",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Số dư khả dụng không đủ.\", function () { pm.expect(pm.response.json().message).to.eql(\"Số dư khả dụng không đủ.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US24 Tasker xem lịch sử ví",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/wallet/transactions?page=1&pageSize=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US24 Khách xem lịch sử thanh toán",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/payments/my"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US24 Tasker xem các khoản đã nhận (kèm chiết khấu)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/payments/my"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US26 Tasker đánh giá khách (đơn 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{bookingId}},\n  \"revieweeId\": {{customerId}},\n  \"rating\": 5,\n  \"comment\": \"Khách thân thiện\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US26 Xem tổng hợp đánh giá của khách",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews/user/{{customerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US27 Tasker báo cáo đánh giá về mình là bất thường",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews/{{reviewId}}/report"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US27 Admin xem đánh giá bị gắn cờ",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews/flagged"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US27 Admin bỏ cờ (giữ đánh giá)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reviews/{{reviewId}}/flag?clear=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US15 Khách xem lịch sử đơn (tìm 'dọn')",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/my?keyword=dọn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US37 Tasker không đến (cần chỉnh giờ hẹn bằng SQL)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking4Id}}",
+            "description": "Kịch bản: tạo đơn, thanh toán, Tasker nhận. Chạy SQL `UPDATE Bookings SET ScheduledTime = DATEADD(MINUTE, -31, SYSUTCDATETIME()) WHERE Id = <id>` → sau ~5 giây đơn có isTaskerNoShow = true. Khách gọi POST /bookings/{id}/retry (tìm Tasker khác) hoặc /cancel (hoàn 100%)."
+          },
+          "event": []
+        }
+      ]
+    },
+    {
+      "name": "Sprint 7 – Hoàn thiện & báo cáo",
+      "item": [
+        {
+          "name": "US05 Xem thông tin cá nhân",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/profile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US05 Cập nhật thông tin cá nhân",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A\",\n  \"phoneNumber\": \"0901234567\",\n  \"address\": \"12 Nguyễn Huệ, Q.1\",\n  \"avatarUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US09 Admin xóa dịch vụ (xóa mềm)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories/{{newServiceId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US09 Admin xem cả dịch vụ đã xóa",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories?includeInactive=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US09 Admin khôi phục dịch vụ",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/servicecategories/{{newServiceId}}/restore"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US31 Báo cáo doanh thu 30 ngày (theo ngày)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/revenue?groupBy=day"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US31 Báo cáo doanh thu theo tháng (from/to)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/revenue?from=2026-01-01T00:00:00Z&to={{nowIso}}&groupBy=month"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"nowIso\", new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US31 from > to → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/revenue?from=2026-10-10T00:00:00Z&to=2026-10-01T00:00:00Z"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Khoảng thời gian không hợp lệ.\", function () { pm.expect(pm.response.json().message).to.eql(\"Khoảng thời gian không hợp lệ.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US32 Số đơn theo trạng thái",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/bookings-summary"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US32 Hiệu suất Tasker",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/reports/tasker-performance"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Đơn 4 (đủ 3 đơn Paid để dùng tiền mặt): Khách tạo đơn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t12h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"t12h\", new Date(Date.now() + 12 * 3600 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"booking4Id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Đơn 4 (đủ 3 đơn Paid để dùng tiền mặt): Khách thanh toán trước",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{booking4Id}},\n  \"method\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Đơn 4 (đủ 3 đơn Paid để dùng tiền mặt): Chờ ghép nối rồi xem đơn",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking4Id}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Chờ BackgroundService ghép nối (chạy mỗi 5 giây)",
+                  "setTimeout(function () {}, 7000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Đã gửi lời mời (status 1)\", function () { pm.expect(j.status).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Đơn 4 (đủ 3 đơn Paid để dùng tiền mặt): Tasker nhận đơn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking4Id}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Đơn 4 (đủ 3 đơn Paid để dùng tiền mặt): Tasker bắt đầu (3)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking4Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 3,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Đơn 4 (đủ 3 đơn Paid để dùng tiền mặt): Tasker hoàn thành (4)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking4Id}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 4,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Khách xác nhận đơn 4",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{booking4Id}}/confirm"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Khách tạo đơn TIỀN MẶT (đủ điều kiện)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t15h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 1,\n  \"paymentMethod\": 0,\n  \"customerPresent\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"t15h\", new Date(Date.now() + 15 * 3600 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"cashBookingId\", j.id);",
+                  "pm.test(\"Đơn tiền mặt → 0 Pending ngay\", function () { pm.expect(j.status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Chờ ghép nối rồi Tasker 1 nhận đơn tiền mặt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{cashBookingId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Chờ BackgroundService ghép nối (chạy mỗi 5 giây)",
+                  "setTimeout(function () {}, 7000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Tasker bắt đầu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{cashBookingId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 3,\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Tasker báo khách chưa thanh toán",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{taskerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings/{{cashBookingId}}/report-unpaid",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Khách nói không có tiền mặt\",\n  \"photoUrl\": \"{{photoUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Khách đang nợ không đặt được đơn mới → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/bookings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": {{serviceId}},\n  \"scheduledTime\": \"{{t3h}}\",\n  \"address\": \"12 Nguyễn Huệ, Q.1, TP.HCM\",\n  \"latitude\": {{jobLat}},\n  \"longitude\": 106.7009,\n  \"note\": \"Nhà có nuôi mèo\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"message: Vui lòng thanh toán khoản nợ trước khi đặt đơn mới.\", function () { pm.expect(pm.response.json().message).to.eql(\"Vui lòng thanh toán khoản nợ trước khi đặt đơn mới.\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US36 Khách trả nợ online",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": {{cashBookingId}},\n  \"method\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Giải ngân ngay (4 Released)\", function () { pm.expect(j.status).to.eql(4); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "US29 Xem thông báo của khách (nhắc lịch, trạng thái đơn...)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications/my",
+            "description": "Nhắc lịch hẹn được gửi khi đơn đã có Tasker nhận và còn ≤ 60 phút đến giờ hẹn (Notifications:AppointmentReminderMinutes)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "photoUrl",
+      "value": "https://placehold.co/600x400.png"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "customerToken",
+      "value": ""
+    },
+    {
+      "key": "taskerToken",
+      "value": ""
+    },
+    {
+      "key": "tasker2Token",
+      "value": ""
+    },
+    {
+      "key": "customerEmail",
+      "value": ""
+    },
+    {
+      "key": "taskerEmail",
+      "value": ""
+    },
+    {
+      "key": "tasker2Email",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "taskerId",
+      "value": ""
+    },
+    {
+      "key": "tasker2Id",
+      "value": ""
+    },
+    {
+      "key": "taskerProfileId",
+      "value": ""
+    },
+    {
+      "key": "tasker2ProfileId",
+      "value": ""
+    },
+    {
+      "key": "serviceId",
+      "value": ""
+    },
+    {
+      "key": "newServiceId",
+      "value": ""
+    },
+    {
+      "key": "newServiceName",
+      "value": ""
+    },
+    {
+      "key": "bookingId",
+      "value": ""
+    },
+    {
+      "key": "booking2Id",
+      "value": ""
+    },
+    {
+      "key": "booking3Id",
+      "value": ""
+    },
+    {
+      "key": "booking4Id",
+      "value": ""
+    },
+    {
+      "key": "cashBookingId",
+      "value": ""
+    },
+    {
+      "key": "disputeId",
+      "value": ""
+    },
+    {
+      "key": "reviewId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "nowIso",
+      "value": ""
+    },
+    {
+      "key": "jobLat",
+      "value": ""
+    },
+    {
+      "key": "t1Lat",
+      "value": ""
+    },
+    {
+      "key": "t15Lat",
+      "value": ""
+    },
+    {
+      "key": "nearLat",
+      "value": ""
+    }
+  ]
+}
