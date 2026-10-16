@@ -149,6 +149,9 @@ namespace HomeService.Api.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("ScheduledTime")
                         .HasColumnType("datetime2");
 
