@@ -1,12 +1,22 @@
 using HomeService.Api.DTOs;
+using HomeService.Api.Enums;
 using HomeService.Api.Models;
 
 namespace HomeService.Api.Services;
 
 public static class BookingMapper
 {
-    /// <summary>Cần Include: Customer, Tasker, ServiceCategory, Payment.</summary>
-    public static BookingResponse ToResponse(Booking b, DateTime nowUtc) => new()
+    public const int DefaultDisputeHours = 24;
+
+    /// <summary>Cần Include: Customer, Tasker, ServiceCategory, Payment, Dispute.</summary>
+    public static BookingResponse ToResponse(Booking b, DateTime nowUtc, int? viewerId = null, int disputeHours = DefaultDisputeHours)
+    {
+        var activeJob = b.Status is BookingStatus.Accepted or BookingStatus.InProgress;
+        var showContact = activeJob && viewerId is not null && (viewerId == b.TaskerId || viewerId == b.CustomerId);
+        return Map(b, nowUtc, disputeHours, showContact);
+    }
+
+    private static BookingResponse Map(Booking b, DateTime nowUtc, int disputeHours, bool showContact) => new()
     {
         Id = b.Id,
         ServiceCategoryName = b.ServiceCategory?.Name ?? string.Empty,
@@ -36,5 +46,10 @@ public static class BookingMapper
         UpdatedAt = b.UpdatedAt,
         MatchRound = b.MatchRound,
         CurrentWave = b.CurrentWave,
+        CancellationFee = b.CancellationFee,
+        DisputeId = b.Dispute?.Id,
+        CanDispute = DisputeService.CanDispute(b, nowUtc, disputeHours),
+        CustomerPhone = showContact ? b.Customer?.PhoneNumber : null,
+        TaskerPhone = showContact ? b.Tasker?.PhoneNumber : null,
     };
 }
