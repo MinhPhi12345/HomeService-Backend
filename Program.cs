@@ -24,6 +24,11 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<MatchingService>();
+builder.Services.AddScoped<WalletService>();
+builder.Services.AddScoped<SettlementService>();
+builder.Services.AddScoped<OfferService>();
+builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<BookingJobs>();
 
 // --- Cấu hình nghiệp vụ (appsettings.json) ---
 builder.Services.Configure<BusinessOptions>(builder.Configuration.GetSection(BusinessOptions.Section));

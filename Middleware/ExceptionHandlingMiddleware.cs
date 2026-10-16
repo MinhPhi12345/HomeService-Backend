@@ -34,6 +34,16 @@ public class ExceptionHandlingMiddleware
                 await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }, JsonDefaults.Options));
             }
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            // 2 thao tác cùng sửa 1 đơn/ví/thanh toán – thao tác đến sau bị từ chối, không ghi đè dữ liệu
+            if (context.Response.HasStarted) throw;
+            context.Response.Clear();
+            context.Response.StatusCode = StatusCodes.Status409Conflict;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(
+                new { message = "Dữ liệu vừa được cập nhật bởi thao tác khác, vui lòng tải lại và thử lại." }, JsonDefaults.Options));
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");

@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BookingOffer> BookingOffers => Set<BookingOffer>();
+    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -67,6 +68,10 @@ public class AppDbContext : DbContext
             e.Property(t => t.WorkingArea).HasMaxLength(100);
             e.Property(t => t.RatingAverage).HasPrecision(3, 2);
             e.Property(t => t.BaseAddress).HasMaxLength(255);
+            e.Ignore(t => t.AvailableBalance);
+            // Chống ghi đè số dư khi 2 thao tác ví chạy cùng lúc (NFR-14)
+            e.Property(t => t.WalletBalance).IsConcurrencyToken();
+            e.Property(t => t.ReservedAmount).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<ServiceCategory>(e =>
@@ -102,6 +107,10 @@ public class AppDbContext : DbContext
             e.Property(b => b.CommissionRate).HasPrecision(5, 4);
             e.HasIndex(b => new { b.Status, b.NextMatchAt });
             e.HasIndex(b => new { b.TaskerId, b.Status });
+            e.Property(b => b.CheckInPhotoUrl).HasMaxLength(500);
+            e.Property(b => b.CheckOutPhotoUrl).HasMaxLength(500);
+            // Chống 2 thao tác đổi trạng thái đơn cùng lúc (vd: khách hủy đúng lúc Tasker bắt đầu)
+            e.Property(b => b.Status).IsConcurrencyToken();
         });
 
         // US16 – lời mời nhận đơn
@@ -120,6 +129,20 @@ public class AppDbContext : DbContext
             .WithOne(b => b.Payment)
             .HasForeignKey<Payment>(p => p.BookingId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Payment>(e =>
+        {
+            e.Property(p => p.GatewayTransactionId).HasMaxLength(64).IsUnicode(false);
+            e.Property(p => p.Status).IsConcurrencyToken(); // NFR-17: không giải ngân/hoàn tiền 2 lần
+        });
+
+        modelBuilder.Entity<WalletTransaction>(e =>
+        {
+            e.HasOne(w => w.Tasker).WithMany().HasForeignKey(w => w.TaskerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(w => w.Booking).WithMany().HasForeignKey(w => w.BookingId).OnDelete(DeleteBehavior.SetNull);
+            e.Property(w => w.Note).HasMaxLength(255);
+            e.HasIndex(w => new { w.TaskerId, w.CreatedAt });
+        });
 
         modelBuilder.Entity<Review>()
             .HasOne(r => r.Booking)
