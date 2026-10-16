@@ -17,14 +17,19 @@ public class BookingService : IBookingService
     private readonly INotificationService _notifications;
     private readonly BusinessOptions _business;
     private readonly SettlementOptions _settlement;
+    private readonly SettlementService _settlementService;
+    private readonly WalletService _wallet;
 
     public BookingService(AppDbContext db, INotificationService notifications,
-        IOptions<BusinessOptions> business, IOptions<SettlementOptions> settlement)
+        IOptions<BusinessOptions> business, IOptions<SettlementOptions> settlement,
+        SettlementService settlementService, WalletService wallet)
     {
         _db = db;
         _notifications = notifications;
         _business = business.Value;
         _settlement = settlement.Value;
+        _settlementService = settlementService;
+        _wallet = wallet;
     }
 
     public async Task<Booking> CreateAsync(int customerId, CreateBookingRequest request)
@@ -110,5 +115,94 @@ public class BookingService : IBookingService
         if (utc < now.AddHours(1) || utc > now.AddDays(30))
             throw ApiException.BadRequest("Thời gian đặt không hợp lệ.");
         return utc;
+    }
+
+    // US18 – Bắt đầu (2 → 3, ảnh check-in) → Hoàn thành (3 → 4 online, ảnh check-out) / (3 → 5 tiền mặt đã thu)
+    public async Task UpdateStatusAsync(int bookingId, int taskerId, UpdateBookingStatusRequest request)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.Payment)
+            .Include(b => b.ServiceCategory)
+            .FirstOrDefaultAsync(b => b.Id == bookingId)
+            ?? throw ApiException.NotFound();
+        if (booking.TaskerId != taskerId) throw ApiException.Forbidden();
+
+        var now = DateTime.UtcNow;
+        var target = request.Status!.Value;
+        var photo = string.IsNullOrWhiteSpace(request.PhotoUrl) ? null : request.PhotoUrl.Trim();
+
+        if (target == BookingStatus.InProgress && booking.Status == BookingStatus.Accepted)
+        {
+            if (photo is null) throw ApiException.BadRequest("Vui lòng chụp ảnh hiện trạng.");
+            booking.Status = BookingStatus.InProgress;
+            booking.CheckInPhotoUrl = photo;
+            booking.UpdatedAt = now;
+            _notifications.Add(booking.CustomerId, "Tasker đã bắt đầu làm việc",
+                $"Đơn {booking.ServiceCategory!.Name} đang được thực hiện.");
+            await _db.SaveChangesAsync();
+            return;
+        }
+
+        if (target == BookingStatus.Completed && booking.Status == BookingStatus.InProgress)
+        {
+            if (photo is null) throw ApiException.BadRequest("Vui lòng chụp ảnh hiện trạng.");
+
+            if (booking.PaymentMethod == PaymentMethod.Cash)
+            {
+                if (request.CashCollected != true)
+                    throw ApiException.BadRequest("Vui lòng xác nhận đã thu đủ tiền mặt hoặc chọn \"Khách chưa thanh toán\".");
+
+                await using var tx = await _db.Database.BeginTransactionAsync();
+                booking.CheckOutPhotoUrl = photo;
+                booking.CompletedAt = now; // mốc tính hạn khiếu nại 24 giờ
+                if (booking.Payment is null)
+                    await _settlementService.SettleCashAsync(booking); // trừ chiết khấu từ ví Tasker → 5 Paid
+                else
+                {
+                    booking.Status = BookingStatus.Paid; // làm lại sau khiếu nại: tiền mặt đã quyết toán trước đó
+                    booking.UpdatedAt = now;
+                }
+                _notifications.Add(booking.CustomerId, "Đơn đã hoàn thành",
+                    $"Đơn {booking.ServiceCategory!.Name} đã hoàn thành và thanh toán tiền mặt. Hãy đánh giá Tasker nhé!");
+                await _db.SaveChangesAsync();
+                await _wallet.RecalculateReservedAsync(taskerId); // giải phóng phần tạm giữ
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+                return;
+            }
+
+            // Đơn online → chờ khách xác nhận (tự xác nhận sau 24 giờ – FR-25)
+            booking.Status = BookingStatus.Completed;
+            booking.CheckOutPhotoUrl = photo;
+            booking.CompletedAt = now;
+            booking.AutoConfirmAt = now.AddHours(_settlement.AutoConfirmHours);
+            booking.AutoConfirmReminderSentAt = null;
+            booking.UpdatedAt = now;
+            _notifications.Add(booking.CustomerId, "Tasker đã hoàn thành công việc",
+                $"Tasker đã hoàn thành công việc. Vui lòng kiểm tra và xác nhận trước {VnTime.Format(booking.AutoConfirmAt.Value)}.");
+            await _db.SaveChangesAsync();
+            return;
+        }
+
+        throw ApiException.BadRequest("Chuyển trạng thái không hợp lệ.");
+    }
+
+    // US34 – Khách xem ảnh và xác nhận hoàn thành → giải ngân cho Tasker (FR-25)
+    public async Task ConfirmAsync(int bookingId, int customerId)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.Payment)
+            .FirstOrDefaultAsync(b => b.Id == bookingId)
+            ?? throw ApiException.NotFound();
+        if (booking.CustomerId != customerId) throw ApiException.Forbidden();
+        if (booking.Status != BookingStatus.Completed)
+            throw ApiException.BadRequest("Đơn không ở trạng thái chờ xác nhận.");
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        await _settlementService.ReleaseOnlineAsync(booking, isAuto: false);
+        booking.Status = BookingStatus.Paid;
+        booking.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
     }
 }

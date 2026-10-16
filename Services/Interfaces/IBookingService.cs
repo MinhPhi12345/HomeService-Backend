@@ -10,4 +10,10 @@ public interface IBookingService
 
     /// <summary>Kiểm tra thời gian đặt hợp lệ: ≥ hiện tại + 1 giờ và ≤ 30 ngày (SRS 6.1).</summary>
     DateTime ValidateScheduledTime(DateTime scheduledTime);
+
+    /// <summary>US18 – Tasker cập nhật trạng thái thực hiện kèm ảnh.</summary>
+    Task UpdateStatusAsync(int bookingId, int taskerId, UpdateBookingStatusRequest request);
+
+    /// <summary>US34 – khách xác nhận hoàn thành → giải ngân.</summary>
+    Task ConfirmAsync(int bookingId, int customerId);
 }
