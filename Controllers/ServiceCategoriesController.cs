@@ -28,8 +28,8 @@ public class ServiceCategoriesController : ControllerBase
         var query = _db.ServiceCategories.AsNoTracking().Where(s => s.IsActive);
         if (!string.IsNullOrWhiteSpace(keyword))
         {
-            var kw = keyword.Trim();
-            query = query.Where(s => s.Name.Contains(kw));
+            var kw = keyword.Trim().ToLower();
+            query = query.Where(s => s.Name.ToLower().Contains(kw)); // không phân biệt hoa thường
         }
 
         var result = await query
