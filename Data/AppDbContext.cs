@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
     public DbSet<BookingOffer> BookingOffers => Set<BookingOffer>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Dispute> Disputes => Set<Dispute>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -145,6 +146,22 @@ public class AppDbContext : DbContext
             e.HasIndex(w => new { w.TaskerId, w.CreatedAt });
         });
 
+        // US35 – khiếu nại
+        modelBuilder.Entity<Dispute>(e =>
+        {
+            e.HasOne(d => d.Booking).WithOne(b => b.Dispute).HasForeignKey<Dispute>(d => d.BookingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(d => d.Customer).WithMany().HasForeignKey(d => d.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(d => d.Tasker).WithMany().HasForeignKey(d => d.TaskerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(d => d.ResolvedBy).WithMany().HasForeignKey(d => d.ResolvedById).OnDelete(DeleteBehavior.Restrict);
+            e.Property(d => d.Description).HasMaxLength(1000);
+            e.Property(d => d.EvidenceUrls).HasMaxLength(2600);
+            e.Property(d => d.TaskerResponse).HasMaxLength(1000);
+            e.Property(d => d.TaskerEvidenceUrls).HasMaxLength(2600);
+            e.Property(d => d.AdminNote).HasMaxLength(1000);
+            e.Property(d => d.Status).IsConcurrencyToken(); // không xử lý 1 khiếu nại 2 lần
+            e.HasIndex(d => d.Status);
+        });
+
         modelBuilder.Entity<AuditLog>(e =>
         {
             e.Property(a => a.Action).HasMaxLength(50).IsUnicode(false);
@@ -173,6 +190,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Review>()
             .Property(r => r.Comment).HasMaxLength(500);
+        modelBuilder.Entity<Review>()
+            .HasIndex(r => new { r.BookingId, r.ReviewerId }).IsUnique(); // BR-R01: mỗi người 1 đánh giá / đơn
+        modelBuilder.Entity<Review>()
+            .ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "[Rating] BETWEEN 1 AND 5"));
 
         modelBuilder.Entity<Notification>(e =>
         {

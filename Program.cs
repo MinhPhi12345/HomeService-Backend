@@ -32,6 +32,8 @@ builder.Services.AddScoped<OfferService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<BookingJobs>();
 builder.Services.AddScoped<CancellationService>();
+builder.Services.AddScoped<TaskerDisciplineService>();
+builder.Services.AddScoped<DisputeService>();
 
 // --- Cấu hình nghiệp vụ (appsettings.json) ---
 builder.Services.Configure<BusinessOptions>(builder.Configuration.GetSection(BusinessOptions.Section));
