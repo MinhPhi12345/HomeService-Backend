@@ -23,9 +23,12 @@ public class ServiceCategoriesController : ControllerBase
     // US10 - Xem/tìm kiếm dịch vụ theo tên (public, không cần đăng nhập); chỉ trả dịch vụ đang hoạt động
     [HttpGet]
     [AllowAnonymous]
-    public async Task<ActionResult<IEnumerable<ServiceCategoryResponse>>> GetAll([FromQuery] string? keyword)
+    public async Task<ActionResult<IEnumerable<ServiceCategoryResponse>>> GetAll([FromQuery] string? keyword,
+        [FromQuery] bool includeInactive = false)
     {
-        var query = _db.ServiceCategories.AsNoTracking().Where(s => s.IsActive);
+        // US09 – Admin xem cả dịch vụ đã xóa mềm (?includeInactive=true) để khôi phục; khách chỉ thấy dịch vụ đang hoạt động
+        var showAll = includeInactive && User.IsInRole(Roles.Admin);
+        var query = _db.ServiceCategories.AsNoTracking().Where(s => showAll || s.IsActive);
         if (!string.IsNullOrWhiteSpace(keyword))
         {
             var kw = keyword.Trim().ToLower();
@@ -91,16 +94,33 @@ public class ServiceCategoriesController : ControllerBase
         return NoContent();
     }
 
-    // US09 - Xóa danh mục dịch vụ (Admin) — soft delete (BR-S01)
+    // US09 - Xóa danh mục dịch vụ (Admin) — soft delete (BR-S01): không hiện ở danh sách, không tạo đơn mới được,
+    // đơn cũ vẫn giữ tham chiếu và tiếp tục xử lý bình thường.
     [HttpDelete("{id:int}")]
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var entity = await _db.ServiceCategories.FindAsync(id);
-        if (entity is null) return NotFound();
+        if (entity is null || !entity.IsActive) return NotFound();
 
         entity.IsActive = false;
         await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    // US09 - Khôi phục dịch vụ đã xóa nhầm (Admin)
+    [HttpPut("{id:int}/restore")]
+    [Authorize(Roles = Roles.Admin)]
+    public async Task<IActionResult> Restore(int id)
+    {
+        var entity = await _db.ServiceCategories.FindAsync(id);
+        if (entity is null) return NotFound();
+        if (!entity.IsActive)
+        {
+            await EnsureUniqueNameAsync(entity.Name, entity.Id);
+            entity.IsActive = true;
+            await _db.SaveChangesAsync();
+        }
         return NoContent();
     }
 
