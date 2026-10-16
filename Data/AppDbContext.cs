@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BookingOffer> BookingOffers => Set<BookingOffer>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -142,6 +143,14 @@ public class AppDbContext : DbContext
             e.HasOne(w => w.Booking).WithMany().HasForeignKey(w => w.BookingId).OnDelete(DeleteBehavior.SetNull);
             e.Property(w => w.Note).HasMaxLength(255);
             e.HasIndex(w => new { w.TaskerId, w.CreatedAt });
+        });
+
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.Property(a => a.Action).HasMaxLength(50).IsUnicode(false);
+            e.Property(a => a.Detail).HasMaxLength(500);
+            e.HasIndex(a => a.BookingId);
+            e.HasIndex(a => a.CreatedAt);
         });
 
         modelBuilder.Entity<Review>()

@@ -13,11 +13,13 @@ public class PaymentService
 {
     private readonly AppDbContext _db;
     private readonly INotificationService _notifications;
+    private readonly AuditService _audit;
 
-    public PaymentService(AppDbContext db, INotificationService notifications)
+    public PaymentService(AppDbContext db, INotificationService notifications, AuditService audit)
     {
         _db = db;
         _notifications = notifications;
+        _audit = audit;
     }
 
     public async Task<Payment> CreateAsync(int customerId, CreatePaymentRequest request)
@@ -68,6 +70,9 @@ public class PaymentService
             GatewayTransactionId = $"SIM{now:yyyyMMddHHmmss}{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}",
         };
         _db.Payments.Add(payment);
+        await _db.SaveChangesAsync();
+        _audit.Add(AuditService.PaymentHeld, payment.Amount, booking.Id, payment.Id,
+            $"Khách trả trước {payment.Amount} qua {method} ({payment.GatewayTransactionId}) – hệ thống tạm giữ");
         _notifications.Add(customerId, "Thanh toán thành công",
             $"Đã thanh toán {MoneyFormat.Vnd(payment.Amount)} cho đơn {booking.ServiceCategory!.Name}. " +
             "Hệ thống đang tạm giữ tiền và tìm Tasker cho bạn.");
