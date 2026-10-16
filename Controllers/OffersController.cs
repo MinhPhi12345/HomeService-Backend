@@ -42,12 +42,20 @@ public class OffersController : ControllerBase
                 o.Id, o.BookingId, ServiceName = o.Booking!.ServiceCategory!.Name, o.Booking.Address,
                 o.Booking.ScheduledTime, o.DistanceKm, o.Booking.TotalPrice, o.Booking.PaymentMethod,
                 o.Booking.CommissionRate, o.ExpiresAt, o.Status, o.Wave, o.Booking.Note, o.Booking.Quantity,
+                o.Booking.CustomerId,
             })
             .ToListAsync();
+
+        var customerIds = offers.Select(o => o.CustomerId).Distinct().ToList();
+        var ratings = await _db.Reviews
+            .Where(r => customerIds.Contains(r.RevieweeId) && !r.IsFlagged)
+            .GroupBy(r => r.RevieweeId)
+            .Select(g => new { CustomerId = g.Key, Avg = g.Average(r => (double)r.Rating) })
+            .ToDictionaryAsync(x => x.CustomerId, x => (decimal?)Math.Round((decimal)x.Avg, 2));
 
         return Ok(offers.Select(o => new OfferResponse(
             o.Id, o.BookingId, o.ServiceName, o.Address, o.ScheduledTime, o.DistanceKm, o.TotalPrice,
             o.PaymentMethod, Math.Round(o.TotalPrice * o.CommissionRate, 0, MidpointRounding.AwayFromZero),
-            o.ExpiresAt, o.Status, o.Wave, o.Note, o.Quantity)));
+            o.ExpiresAt, o.Status, o.Wave, o.Note, o.Quantity, ratings.GetValueOrDefault(o.CustomerId))));
     }
 }
