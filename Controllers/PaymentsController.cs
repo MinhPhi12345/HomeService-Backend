@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.DTOs;
 using HomeService.Api.Extensions;
 using HomeService.Api.Services;
@@ -21,7 +22,7 @@ public class PaymentsController : ControllerBase
 
     // US21 - Khách thanh toán trước đơn online (ví/thẻ – mô phỏng); tiền được tạm giữ, đơn chuyển sang tìm Tasker
     [HttpPost]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = Roles.Customer)]
     public async Task<ActionResult<PaymentResponse>> Create(CreatePaymentRequest request)
     {
         var payment = await _payments.CreateAsync(User.GetUserId(), request);

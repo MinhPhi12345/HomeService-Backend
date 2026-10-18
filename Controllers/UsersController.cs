@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,7 @@ namespace HomeService.Api.Controllers;
 // EP01 - US06 (phân quyền) / EP08 - US30 (quản lý KH & Tasker)
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = Roles.Admin)]
 public class UsersController : ControllerBase
 {
     private readonly AppDbContext _db;

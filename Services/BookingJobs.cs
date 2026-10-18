@@ -19,10 +19,12 @@ public class BookingJobs
     private readonly SettlementService _settlement;
     private readonly SettlementOptions _opt;
     private readonly ILogger<BookingJobs> _logger;
+    private readonly CancellationService _cancellation;
 
     public BookingJobs(AppDbContext db, INotificationService notifications, SettlementService settlement,
-        IOptions<SettlementOptions> options, ILogger<BookingJobs> logger)
+        IOptions<SettlementOptions> options, ILogger<BookingJobs> logger, CancellationService cancellation)
     {
+        _cancellation = cancellation;
         _db = db;
         _notifications = notifications;
         _settlement = settlement;
@@ -94,6 +96,47 @@ public class BookingJobs
                 booking.IsAutoConfirmed = true;
                 _notifications.Add(booking.CustomerId, "Đơn đã tự xác nhận hoàn thành",
                     $"Đơn #{booking.Id} đã được hệ thống tự xác nhận sau {_opt.AutoConfirmHours} giờ.");
+                await _db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _logger.LogInformation("Đơn {Id} đã được xử lý bởi thao tác khác, bỏ qua", id);
+            }
+            finally
+            {
+                _db.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    /// <summary>
+    /// US33 / BR-M05 – đơn "Chưa có Tasker nhận" quá 24 giờ khách không xử lý, hoặc đã quá giờ hẹn → 9 Expired,
+    /// đơn online được hoàn 100%.
+    /// </summary>
+    public async Task ExpireNoTaskerFoundAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var cutoff = now.AddHours(-24);
+        var ids = await _db.Bookings
+            .Where(b => b.Status == BookingStatus.NoTaskerFound
+                        && ((b.UpdatedAt != null && b.UpdatedAt <= cutoff) || b.ScheduledTime <= now))
+            .Select(b => b.Id)
+            .Take(100)
+            .ToListAsync(ct);
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                await using var tx = await _db.Database.BeginTransactionAsync(ct);
+                var booking = await _db.Bookings.Include(b => b.Payment).FirstAsync(b => b.Id == id, ct);
+                if (booking.Status != BookingStatus.NoTaskerFound) continue;
+                booking.Status = BookingStatus.Expired;
+                booking.UpdatedAt = now;
+                await _settlement.RefundHeldAsync(booking, 0, "Đơn đã hết hạn vì chưa có Tasker nhận.");
+                _notifications.Add(booking.CustomerId, "Đơn đã hết hạn",
+                    $"Đơn #{booking.Id} đã hết hạn vì chưa có Tasker nhận. Bạn có thể tạo đơn mới.");
                 await _db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
             }

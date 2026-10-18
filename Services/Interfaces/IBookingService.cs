@@ -16,4 +16,7 @@ public interface IBookingService
 
     /// <summary>US34 – khách xác nhận hoàn thành → giải ngân.</summary>
     Task ConfirmAsync(int bookingId, int customerId);
+
+    /// <summary>US33 – thử lại ghép nối (có thể đổi giờ) khi chưa có Tasker nhận.</summary>
+    Task RetryAsync(int bookingId, int customerId, RetryBookingRequest? request);
 }

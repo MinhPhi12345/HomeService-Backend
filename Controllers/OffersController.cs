@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
@@ -11,7 +12,7 @@ namespace HomeService.Api.Controllers;
 // US16/US17 – Tasker xem lời mời nhận đơn đang chờ
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Tasker")]
+[Authorize(Roles = Roles.Tasker)]
 public class OffersController : ControllerBase
 {
     private readonly AppDbContext _db;

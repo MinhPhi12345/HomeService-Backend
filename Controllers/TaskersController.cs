@@ -30,7 +30,7 @@ public class TaskersController : ControllerBase
 
     // US04 - Tasker gửi / cập nhật hồ sơ (CCCD, kỹ năng, khu vực, điểm làm việc, bán kính phục vụ)
     [HttpPost("profile")]
-    [Authorize(Roles = "Tasker")]
+    [Authorize(Roles = Roles.Tasker)]
     public async Task<ActionResult<TaskerProfileResponse>> SubmitProfile(TaskerProfileRequest request)
     {
         if (!AllowedRadiusKm.Contains(request.ServiceRadiusKm!.Value))
@@ -75,7 +75,7 @@ public class TaskersController : ControllerBase
 
     // US04 - Tasker xem hồ sơ & trạng thái duyệt của mình
     [HttpGet("profile")]
-    [Authorize(Roles = "Tasker")]
+    [Authorize(Roles = Roles.Tasker)]
     public async Task<ActionResult<TaskerProfileResponse>> GetMyProfile()
     {
         var userId = User.GetUserId();
@@ -86,7 +86,7 @@ public class TaskersController : ControllerBase
 
     // US04 - Admin xem danh sách hồ sơ Tasker chờ duyệt (chỉ hồ sơ đã gửi CCCD)
     [HttpGet("pending-verification")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<ActionResult<IEnumerable<PendingTaskerItem>>> GetPendingVerification()
     {
         var pending = await _db.TaskerProfiles
@@ -104,7 +104,7 @@ public class TaskersController : ControllerBase
 
     // US04 - Admin duyệt/từ chối hồ sơ Tasker (tham số là taskerProfileId, KHÔNG phải userId)
     [HttpPut("{taskerProfileId:int}/verification")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> SetVerification(int taskerProfileId, [FromQuery] bool approve)
     {
         var profile = await _db.TaskerProfiles.FindAsync(taskerProfileId);
@@ -126,7 +126,7 @@ public class TaskersController : ControllerBase
 
     // US16 - Tasker bật/tắt nhận đơn; app gửi vị trí hiện tại 1 lần khi bật (không theo dõi GPS chạy ngầm – BR-M06)
     [HttpPut("availability")]
-    [Authorize(Roles = "Tasker")]
+    [Authorize(Roles = Roles.Tasker)]
     public async Task<IActionResult> UpdateAvailability(UpdateAvailabilityRequest request)
     {
         var userId = User.GetUserId();
