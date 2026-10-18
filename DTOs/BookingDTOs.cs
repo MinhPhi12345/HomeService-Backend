@@ -32,8 +32,20 @@ public class CreateBookingRequest
     public bool? CustomerPresent { get; set; }
 }
 
-// US18
-public record UpdateBookingStatusRequest(BookingStatus Status);
+// US18 – body của PUT /api/bookings/{id}/status
+public class UpdateBookingStatusRequest
+{
+    /// <summary>Chỉ 3 (InProgress – Bắt đầu) hoặc 4 (Completed – Hoàn thành).</summary>
+    [Required(ErrorMessage = "Chuyển trạng thái không hợp lệ.")]
+    public BookingStatus? Status { get; set; }
+
+    /// <summary>Bắt buộc: URL ảnh check-in (status 3) / check-out (status 4) lấy từ POST /api/uploads.</summary>
+    [MaxLength(500)]
+    public string? PhotoUrl { get; set; }
+
+    /// <summary>Đơn tiền mặt, status 4: phải là true (đã thu đủ). Chưa thu → dùng report-unpaid.</summary>
+    public bool? CashCollected { get; set; }
+}
 
 // SRS 9.4 – BookingResponse. Field mới luôn thêm vào CUỐI để không phá FE cũ.
 public class BookingResponse

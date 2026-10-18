@@ -25,7 +25,9 @@ public class BookingWorker : BackgroundService
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(1, _matching.TickSeconds)));
         do
         {
+            await RunStepAsync<BookingJobs>(s => s.ExpireUnpaidBookingsAsync(stoppingToken), "hủy đơn quá hạn thanh toán", stoppingToken);
             await RunStepAsync<MatchingService>(s => s.ProcessDueBookingsAsync(stoppingToken), "ghép nối", stoppingToken);
+            await RunStepAsync<BookingJobs>(s => s.AutoConfirmAsync(stoppingToken), "tự xác nhận hoàn thành", stoppingToken);
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }

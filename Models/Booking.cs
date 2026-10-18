@@ -41,6 +41,16 @@ public class Booking
     public int CurrentWave { get; set; } = 0; // 0 = chưa bắt đầu, 1–3
     public DateTime? NextMatchAt { get; set; } // lần xử lý ghép nối kế tiếp
 
+    // US18 – ảnh check-in/check-out (bằng chứng khi khiếu nại, không sửa/xóa được)
+    public string? CheckInPhotoUrl { get; set; }
+    public string? CheckOutPhotoUrl { get; set; }
+
+    // US34 – xác nhận hoàn thành & giải ngân
+    public DateTime? CompletedAt { get; set; }     // lúc Tasker bấm Hoàn thành; mốc tính hạn khiếu nại
+    public DateTime? AutoConfirmAt { get; set; }   // = CompletedAt + 24 giờ
+    public bool IsAutoConfirmed { get; set; }
+    public DateTime? AutoConfirmReminderSentAt { get; set; } // đã nhắc khách trước hạn tự xác nhận
+
     public Payment? Payment { get; set; }
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<BookingOffer> Offers { get; set; } = new List<BookingOffer>();

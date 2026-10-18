@@ -35,9 +35,26 @@ namespace HomeService.Api.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<DateTime?>("AutoConfirmAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("AutoConfirmReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CheckInPhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("CheckOutPhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<decimal>("CommissionRate")
                         .HasPrecision(5, 4)
                         .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -49,6 +66,9 @@ namespace HomeService.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<bool>("CustomerPresent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsAutoConfirmed")
                         .HasColumnType("bit");
 
                     b.Property<double?>("Latitude")
@@ -83,6 +103,7 @@ namespace HomeService.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("int");
 
                     b.Property<int?>("TaskerId")
@@ -214,14 +235,34 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("GatewayTransactionId")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
                     b.Property<int>("Method")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal>("RefundedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("int");
+
+                    b.Property<decimal>("TaskerAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
@@ -361,6 +402,11 @@ namespace HomeService.Api.Migrations
                         .HasPrecision(3, 2)
                         .HasColumnType("decimal(3,2)");
 
+                    b.Property<decimal>("ReservedAmount")
+                        .IsConcurrencyToken()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("ServiceRadiusKm")
                         .HasColumnType("int");
 
@@ -378,6 +424,7 @@ namespace HomeService.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("WalletBalance")
+                        .IsConcurrencyToken()
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
@@ -454,6 +501,47 @@ namespace HomeService.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.WalletTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("TaskerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("TaskerId", "CreatedAt");
+
+                    b.ToTable("WalletTransactions");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.Booking", b =>
@@ -559,6 +647,24 @@ namespace HomeService.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.WalletTransaction", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HomeService.Api.Models.User", "Tasker")
+                        .WithMany()
+                        .HasForeignKey("TaskerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Tasker");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.Booking", b =>

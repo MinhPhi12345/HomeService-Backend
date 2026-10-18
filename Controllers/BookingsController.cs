@@ -19,11 +19,13 @@ public class BookingsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IBookingService _bookingService;
+    private readonly OfferService _offers;
 
-    public BookingsController(AppDbContext db, IBookingService bookingService)
+    public BookingsController(AppDbContext db, IBookingService bookingService, OfferService offers)
     {
         _db = db;
         _bookingService = bookingService;
+        _offers = offers;
     }
 
     private int CurrentUserId => User.GetUserId();
@@ -67,31 +69,30 @@ public class BookingsController : ControllerBase
         return Ok(BookingMapper.ToResponse(booking, DateTime.UtcNow));
     }
 
-    // US17 - Tasker nhận / từ chối đơn
+    // US17 - Tasker nhận lời mời – người nhận đầu tiên thắng (409 nếu đơn đã có Tasker khác nhận / lời mời hết hạn)
     [HttpPost("{id:int}/accept")]
     [Authorize(Roles = "Tasker")]
     public async Task<IActionResult> Accept(int id)
     {
-        var booking = await _db.Bookings.FindAsync(id);
-        if (booking is null) return NotFound();
-
-        booking.TaskerId = CurrentUserId;
-        booking.Status = BookingStatus.Accepted;
-        booking.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await _offers.AcceptAsync(id, CurrentUserId);
         return NoContent();
     }
 
+    // US17 - Tasker từ chối lời mời (chỉ đóng lời mời của Tasker này, đơn vẫn chờ Tasker khác)
     [HttpPost("{id:int}/reject")]
     [Authorize(Roles = "Tasker")]
     public async Task<IActionResult> Reject(int id)
     {
-        var booking = await _db.Bookings.FindAsync(id);
-        if (booking is null) return NotFound();
+        await _offers.RejectAsync(id, CurrentUserId);
+        return NoContent();
+    }
 
-        booking.Status = BookingStatus.Rejected;
-        booking.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+    // US34 - Khách xác nhận hoàn thành → giải ngân cho Tasker sau chiết khấu
+    [HttpPost("{id:int}/confirm")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> Confirm(int id)
+    {
+        await _bookingService.ConfirmAsync(id, CurrentUserId);
         return NoContent();
     }
 
@@ -110,19 +111,12 @@ public class BookingsController : ControllerBase
         return NoContent();
     }
 
-    // US18 - Tasker cập nhật trạng thái thực hiện đơn
+    // US18 - Tasker cập nhật trạng thái thực hiện đơn kèm ảnh (3 Bắt đầu, 4 Hoàn thành)
     [HttpPut("{id:int}/status")]
     [Authorize(Roles = "Tasker")]
     public async Task<IActionResult> UpdateStatus(int id, UpdateBookingStatusRequest request)
     {
-        var booking = await _db.Bookings.FindAsync(id);
-        if (booking is null) return NotFound();
-
-        booking.Status = request.Status;
-        booking.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-
-        // TODO (US29): tạo Notification cho khách hàng khi trạng thái thay đổi
+        await _bookingService.UpdateStatusAsync(id, CurrentUserId, request);
         return NoContent();
     }
 

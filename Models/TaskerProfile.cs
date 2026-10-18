@@ -17,7 +17,8 @@ public class TaskerProfile
 
     public TaskerVerificationStatus VerificationStatus { get; set; } = TaskerVerificationStatus.Pending;
     public decimal RatingAverage { get; set; } = 5.0m;
-    public decimal WalletBalance { get; set; } = 0m; // US23: ví trả trước
+    public decimal WalletBalance { get; set; } = 0m; // US23: ví trả trước, luôn ≥ 0 (BR-P04)
+    public decimal ReservedAmount { get; set; } = 0m; // BR-P05: hoa hồng tạm giữ cho đơn tiền mặt đang thực hiện
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -33,5 +34,7 @@ public class TaskerProfile
     public double? LastLatitude { get; set; }
     public double? LastLongitude { get; set; }
     public DateTime? LastLocationAt { get; set; }
+    public decimal AvailableBalance => WalletBalance - ReservedAmount; // không lưu DB
+
     public DateTime? SubmittedAt { get; set; } // lần gửi hồ sơ gần nhất (để Admin sắp xếp danh sách chờ duyệt)
 }

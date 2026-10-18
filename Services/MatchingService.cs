@@ -239,7 +239,7 @@ public class MatchingService
             .Select(g => new { TaskerId = g.Key, Last = g.Max(o => o.RespondedAt) })
             .ToListAsync(ct);
 
-        var commissionEstimate = Math.Round(booking.TotalPrice * booking.CommissionRate, 0, MidpointRounding.AwayFromZero);
+        var commissionEstimate = Money.Commission(booking.TotalPrice, booking.CommissionRate);
 
         var result = new List<Candidate>();
         foreach (var (t, d) in inRange)
@@ -247,7 +247,7 @@ public class MatchingService
             if (busy.Contains(t.UserId)) continue;
 
             // BR-P04: đơn tiền mặt chỉ mời Tasker đủ số dư ví để trừ chiết khấu
-            if (booking.PaymentMethod == PaymentMethod.Cash && t.WalletBalance < commissionEstimate) continue;
+            if (booking.PaymentMethod == PaymentMethod.Cash && t.WalletBalance - t.ReservedAmount < commissionEstimate) continue;
 
             var maxRadius = _opt.Radii.Max();
             var distanceScore = Math.Clamp(1 - d / maxRadius, 0, 1);
