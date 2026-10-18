@@ -32,6 +32,8 @@ public class OfferService
         var profile = await _db.TaskerProfiles.FirstOrDefaultAsync(t => t.UserId == taskerId);
         if (profile is null || profile.VerificationStatus != TaskerVerificationStatus.Approved)
             throw ApiException.BadRequest("Hồ sơ Tasker chưa được duyệt."); // BR-A04
+        if (profile.SuspendedUntil is not null && profile.SuspendedUntil > now)
+            throw ApiException.BadRequest($"Tài khoản của bạn đang bị tạm khóa nhận đơn đến {VnTime.Format(profile.SuspendedUntil.Value)}.");
 
         var offer = await GetOfferAsync(booking.Id, booking.MatchRound, taskerId);
 

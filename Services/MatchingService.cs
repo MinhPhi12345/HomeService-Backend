@@ -193,6 +193,7 @@ public class MatchingService
             .Where(t => t.VerificationStatus == TaskerVerificationStatus.Approved
                         && t.IsAvailable
                         && t.User!.IsActive
+                        && (t.SuspendedUntil == null || t.SuspendedUntil <= now)
                         && !invited.Contains(t.UserId))
             .ToListAsync(ct);
 

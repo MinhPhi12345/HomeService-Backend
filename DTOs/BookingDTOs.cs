@@ -83,4 +83,12 @@ public class BookingResponse
     public DateTime? UpdatedAt { get; init; }
     public int MatchRound { get; init; }
     public int CurrentWave { get; init; }
+    public decimal CancellationFee { get; init; }
+    public int? DisputeId { get; init; }
+    /// <summary>SĐT khách – chỉ trả cho Tasker của đơn khi đơn đang Accepted/InProgress (US20), còn lại null.</summary>
+    public string? CustomerPhone { get; init; }
+    public string? TaskerPhone { get; init; }
 }
+
+// US14 – GET /api/bookings/{id}/cancellation-fee
+public record CancellationFeeResponse(decimal CancellationFee, decimal RefundAmount, string Reason);

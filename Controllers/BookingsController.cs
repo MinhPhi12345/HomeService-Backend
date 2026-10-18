@@ -4,11 +4,13 @@ using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
 using HomeService.Api.Extensions;
 using HomeService.Api.Models;
+using HomeService.Api.Options;
 using HomeService.Api.Services;
 using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HomeService.Api.Controllers;
 
@@ -22,10 +24,12 @@ public class BookingsController : ControllerBase
     private readonly IBookingService _bookingService;
     private readonly OfferService _offers;
     private readonly CancellationService _cancellation;
+    private readonly SettlementOptions _settlementOptions;
 
     public BookingsController(AppDbContext db, IBookingService bookingService, OfferService offers,
-        CancellationService cancellation)
+        CancellationService cancellation, IOptions<SettlementOptions> settlementOptions)
     {
+        _settlementOptions = settlementOptions.Value;
         _db = db;
         _bookingService = bookingService;
         _offers = offers;
@@ -43,10 +47,11 @@ public class BookingsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, await ToResponse(booking.Id));
     }
 
-    // US15 - Khách hàng xem lịch sử đặt dịch vụ / US20 - Tasker xem đơn đã nhận (BE tự lọc theo vai trò trong token)
+    // US15 - Khách hàng xem lịch sử đặt dịch vụ / US20 - Tasker xem đơn đã nhận (BE tự lọc theo vai trò trong token).
+    // Mặc định mới nhất trước. Bổ sung: ?status=2,3 lọc theo trạng thái; ?upcoming=true → đơn sắp làm, sắp theo giờ hẹn.
     [HttpGet("my")]
     [Authorize(Roles = Roles.CustomerOrTasker)]
-    public async Task<ActionResult<IEnumerable<BookingResponse>>> GetMine()
+    public async Task<ActionResult<IEnumerable<BookingResponse>>> GetMine([FromQuery] string? status, [FromQuery] bool upcoming = false)
     {
         var userId = CurrentUserId;
         var query = BookingsWithDetails();
@@ -54,10 +59,28 @@ public class BookingsController : ControllerBase
             ? query.Where(b => b.TaskerId == userId)
             : query.Where(b => b.CustomerId == userId);
 
-        var bookings = await query.OrderByDescending(b => b.CreatedAt).ToListAsync();
+        var statuses = ParseStatuses(status);
+        if (statuses.Count > 0) query = query.Where(b => statuses.Contains(b.Status));
+
+        if (upcoming)
+            query = query.Where(b => b.Status == BookingStatus.Accepted || b.Status == BookingStatus.InProgress)
+                         .OrderBy(b => b.ScheduledTime);
+        else
+            query = query.OrderByDescending(b => b.CreatedAt);
+
+        var bookings = await query.ToListAsync();
         var now = DateTime.UtcNow;
-        return Ok(bookings.Select(b => BookingMapper.ToResponse(b, now)));
+        return Ok(bookings.Select(b => BookingMapper.ToResponse(b, now, userId, _settlementOptions.DisputeHours)));
     }
+
+    private static List<BookingStatus> ParseStatuses(string? csv) =>
+        string.IsNullOrWhiteSpace(csv)
+            ? new List<BookingStatus>()
+            : csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Select(x => int.TryParse(x, out var v) && Enum.IsDefined(typeof(BookingStatus), v)
+                     ? (BookingStatus)v
+                     : throw ApiException.BadRequest("Trạng thái lọc không hợp lệ."))
+                 .ToList();
 
     // Chi tiết đơn – chỉ Khách hàng của đơn, Tasker của đơn hoặc Admin được xem (FR-11)
     [HttpGet("{id:int}")]
@@ -70,7 +93,7 @@ public class BookingsController : ControllerBase
         var allowed = User.IsInRole(UserRole.Admin) || booking.CustomerId == userId || booking.TaskerId == userId;
         if (!allowed) return Forbid();
 
-        return Ok(BookingMapper.ToResponse(booking, DateTime.UtcNow));
+        return Ok(BookingMapper.ToResponse(booking, DateTime.UtcNow, userId, _settlementOptions.DisputeHours));
     }
 
     // US17 - Tasker nhận lời mời – người nhận đầu tiên thắng (409 nếu đơn đã có Tasker khác nhận / lời mời hết hạn)
@@ -113,6 +136,32 @@ public class BookingsController : ControllerBase
 
         await _cancellation.CancelAsync(booking, "Khách hàng đã hủy đơn.");
         return NoContent();
+    }
+
+    // US14 - Xem trước phí hủy & số tiền được hoàn (hiện trong hộp thoại xác nhận hủy)
+    [HttpGet("{id:int}/cancellation-fee")]
+    [Authorize(Roles = Roles.Customer)]
+    public async Task<ActionResult<CancellationFeeResponse>> GetCancellationFee(int id)
+    {
+        var booking = await _db.Bookings.AsNoTracking().Include(b => b.Payment).FirstOrDefaultAsync(b => b.Id == id);
+        if (booking is null) return NotFound();
+        if (booking.CustomerId != CurrentUserId) return Forbid();
+        if (!CancellationService.CancellableStatuses.Contains(booking.Status))
+            throw ApiException.BadRequest("Không thể hủy đơn ở trạng thái hiện tại.");
+
+        var (fee, reason) = await _cancellation.CalculateFeeAsync(booking);
+        return Ok(new CancellationFeeResponse(fee, CancellationService.RefundIfCancelled(booking, fee), reason));
+    }
+
+    // US35 - Khách khiếu nại trong 24 giờ sau khi Tasker hoàn thành (kèm 1–5 ảnh)
+    [HttpPost("{id:int}/dispute")]
+    [Authorize(Roles = Roles.Customer)]
+    public async Task<ActionResult<DisputeResponse>> CreateDispute(int id, CreateDisputeRequest request,
+        [FromServices] DisputeService disputes)
+    {
+        var dispute = await disputes.CreateAsync(id, CurrentUserId, request);
+        var full = await disputes.QueryWithDetails().FirstAsync(d => d.Id == dispute.Id);
+        return StatusCode(StatusCodes.Status201Created, disputes.ToResponse(full));
     }
 
     // US33 - Thử lại ghép nối (body tùy chọn { "scheduledTime": "..." } để đổi giờ)
@@ -177,11 +226,12 @@ public class BookingsController : ControllerBase
         .Include(x => x.Customer)
         .Include(x => x.Tasker)
         .Include(x => x.ServiceCategory)
-        .Include(x => x.Payment);
+        .Include(x => x.Payment)
+        .Include(x => x.Dispute);
 
     private async Task<BookingResponse> ToResponse(int id)
     {
         var b = await BookingsWithDetails().FirstAsync(x => x.Id == id);
-        return BookingMapper.ToResponse(b, DateTime.UtcNow);
+        return BookingMapper.ToResponse(b, DateTime.UtcNow, CurrentUserId, _settlementOptions.DisputeHours);
     }
 }

@@ -51,7 +51,11 @@ public class Booking
     public bool IsAutoConfirmed { get; set; }
     public DateTime? AutoConfirmReminderSentAt { get; set; } // đã nhắc khách trước hạn tự xác nhận
 
+    // US14 – phí hủy đã tính khi khách hủy (BR-C01)
+    public decimal CancellationFee { get; set; }
+
     public Payment? Payment { get; set; }
+    public Dispute? Dispute { get; set; }
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<BookingOffer> Offers { get; set; } = new List<BookingOffer>();
 }

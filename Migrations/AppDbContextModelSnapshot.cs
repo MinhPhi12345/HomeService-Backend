@@ -84,6 +84,10 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime?>("AutoConfirmReminderSentAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal>("CancellationFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("CheckInPhotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -222,6 +226,90 @@ namespace HomeService.Api.Migrations
                     b.ToTable("BookingOffers");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.Dispute", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("EvidenceUrls")
+                        .IsRequired()
+                        .HasMaxLength(2600)
+                        .HasColumnType("nvarchar(2600)");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RedoScheduledTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("Resolution")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ResolvedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.Property<string>("TaskerEvidenceUrls")
+                        .HasMaxLength(2600)
+                        .HasColumnType("nvarchar(2600)");
+
+                    b.Property<int>("TaskerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("TaskerRespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TaskerResponse")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ResolvedById");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TaskerId");
+
+                    b.ToTable("Disputes");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -347,13 +435,17 @@ namespace HomeService.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BookingId");
-
                     b.HasIndex("RevieweeId");
 
                     b.HasIndex("ReviewerId");
 
-                    b.ToTable("Reviews");
+                    b.HasIndex("BookingId", "ReviewerId")
+                        .IsUnique();
+
+                    b.ToTable("Reviews", t =>
+                        {
+                            t.HasCheckConstraint("CK_Reviews_Rating", "[Rating] BETWEEN 1 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.ServiceCategory", b =>
@@ -460,10 +552,16 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime?>("SubmittedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("SuspendedUntil")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.Property<int>("VerificationStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ViolationPoints")
                         .HasColumnType("int");
 
                     b.Property<decimal>("WalletBalance")
@@ -632,6 +730,40 @@ namespace HomeService.Api.Migrations
                     b.Navigation("Tasker");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.Dispute", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.Booking", "Booking")
+                        .WithOne("Dispute")
+                        .HasForeignKey("HomeService.Api.Models.Dispute", "BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeService.Api.Models.User", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HomeService.Api.Models.User", "ResolvedBy")
+                        .WithMany()
+                        .HasForeignKey("ResolvedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HomeService.Api.Models.User", "Tasker")
+                        .WithMany()
+                        .HasForeignKey("TaskerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("ResolvedBy");
+
+                    b.Navigation("Tasker");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.Notification", b =>
                 {
                     b.HasOne("HomeService.Api.Models.User", "User")
@@ -712,6 +844,8 @@ namespace HomeService.Api.Migrations
 
             modelBuilder.Entity("HomeService.Api.Models.Booking", b =>
                 {
+                    b.Navigation("Dispute");
+
                     b.Navigation("Offers");
 
                     b.Navigation("Payment");

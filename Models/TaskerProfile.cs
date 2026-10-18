@@ -34,6 +34,10 @@ public class TaskerProfile
     public double? LastLatitude { get; set; }
     public double? LastLongitude { get; set; }
     public DateTime? LastLocationAt { get; set; }
+    // US35/US37 – điểm vi phạm (BR-D02): đủ 3 điểm → tạm khóa nhận đơn 7 ngày, điểm về 0
+    public int ViolationPoints { get; set; }
+    public DateTime? SuspendedUntil { get; set; }
+
     public decimal AvailableBalance => WalletBalance - ReservedAmount; // không lưu DB
 
     public DateTime? SubmittedAt { get; set; } // lần gửi hồ sơ gần nhất (để Admin sắp xếp danh sách chờ duyệt)
