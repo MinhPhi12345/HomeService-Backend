@@ -47,11 +47,12 @@ public class BookingsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, await ToResponse(booking.Id));
     }
 
-    // US15 - Khách hàng xem lịch sử đặt dịch vụ / US20 - Tasker xem đơn đã nhận (BE tự lọc theo vai trò trong token).
+    // US15 - Khách hàng xem lịch sử đặt dịch vụ (đặt lại: dùng serviceCategoryId, address, latitude, longitude, note, quantity) / US20 - Tasker xem đơn đã nhận (BE tự lọc theo vai trò trong token).
     // Mặc định mới nhất trước. Bổ sung: ?status=2,3 lọc theo trạng thái; ?upcoming=true → đơn sắp làm, sắp theo giờ hẹn.
     [HttpGet("my")]
     [Authorize(Roles = Roles.CustomerOrTasker)]
-    public async Task<ActionResult<IEnumerable<BookingResponse>>> GetMine([FromQuery] string? status, [FromQuery] bool upcoming = false)
+    public async Task<ActionResult<IEnumerable<BookingResponse>>> GetMine([FromQuery] string? status, [FromQuery] bool upcoming = false,
+        [FromQuery] string? keyword = null)
     {
         var userId = CurrentUserId;
         var query = BookingsWithDetails();
@@ -61,6 +62,13 @@ public class BookingsController : ControllerBase
 
         var statuses = ParseStatuses(status);
         if (statuses.Count > 0) query = query.Where(b => statuses.Contains(b.Status));
+
+        // US15 – tìm lại đơn cũ theo tên dịch vụ hoặc địa chỉ để đặt lại dịch vụ tương tự
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var kw = keyword.Trim().ToLower();
+            query = query.Where(b => b.ServiceCategory!.Name.ToLower().Contains(kw) || b.Address.ToLower().Contains(kw));
+        }
 
         if (upcoming)
             query = query.Where(b => b.Status == BookingStatus.Accepted || b.Status == BookingStatus.InProgress)
@@ -181,6 +189,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
         if (booking is null) return NotFound();
         if (booking.TaskerId != CurrentUserId) return Forbid();
+        if (booking.IsTaskerNoShow) throw ApiException.Conflict("Đơn đã quá giờ hẹn, không thể bắt đầu.");
         if (booking.Status != BookingStatus.Accepted && booking.Status != BookingStatus.InProgress)
             throw ApiException.BadRequest("Chỉ gửi vị trí khi đơn đang được thực hiện.");
 
@@ -227,7 +236,8 @@ public class BookingsController : ControllerBase
         .Include(x => x.Tasker)
         .Include(x => x.ServiceCategory)
         .Include(x => x.Payment)
-        .Include(x => x.Dispute);
+        .Include(x => x.Dispute)
+        .Include(x => x.Reviews);
 
     private async Task<BookingResponse> ToResponse(int id)
     {

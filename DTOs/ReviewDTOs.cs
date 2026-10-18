@@ -24,3 +24,6 @@ public record ReviewResponse(
     // Bổ sung
     string RevieweeName
 );
+
+// US26 – GET /api/reviews/user/{userId}
+public record UserReviewSummary(int UserId, int ReviewCount, decimal? RatingAverage, IReadOnlyList<ReviewResponse> Reviews);

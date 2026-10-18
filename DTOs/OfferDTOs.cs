@@ -18,5 +18,7 @@ public record OfferResponse(
     // Bổ sung: hiển thị thêm cho Tasker
     int Wave,
     string? Note,
-    int Quantity
+    int Quantity,
+    // US26 – uy tín của khách (điểm trung bình Tasker đánh giá khách; null nếu chưa có)
+    decimal? CustomerRatingAverage
 );

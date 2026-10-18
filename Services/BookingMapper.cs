@@ -8,15 +8,18 @@ public static class BookingMapper
 {
     public const int DefaultDisputeHours = 24;
 
-    /// <summary>Cần Include: Customer, Tasker, ServiceCategory, Payment, Dispute.</summary>
+    /// <summary>Cần Include: Customer, Tasker, ServiceCategory, Payment, Dispute, Reviews.</summary>
     public static BookingResponse ToResponse(Booking b, DateTime nowUtc, int? viewerId = null, int disputeHours = DefaultDisputeHours)
     {
         var activeJob = b.Status is BookingStatus.Accepted or BookingStatus.InProgress;
         var showContact = activeJob && viewerId is not null && (viewerId == b.TaskerId || viewerId == b.CustomerId);
-        return Map(b, nowUtc, disputeHours, showContact);
+        var finished = b.Status is BookingStatus.Completed or BookingStatus.Paid;
+        var isParty = viewerId is not null && b.TaskerId is not null && (viewerId == b.TaskerId || viewerId == b.CustomerId);
+        var canReview = finished && isParty && b.Reviews.All(r => r.ReviewerId != viewerId);
+        return Map(b, nowUtc, disputeHours, showContact, canReview);
     }
 
-    private static BookingResponse Map(Booking b, DateTime nowUtc, int disputeHours, bool showContact) => new()
+    private static BookingResponse Map(Booking b, DateTime nowUtc, int disputeHours, bool showContact, bool canReview) => new()
     {
         Id = b.Id,
         ServiceCategoryName = b.ServiceCategory?.Name ?? string.Empty,
@@ -35,6 +38,7 @@ public static class BookingMapper
         PaymentStatus = b.Payment?.Status,
         PaymentDueAt = b.PaymentDueAt,
         CompletedAt = b.CompletedAt,
+        IsTaskerNoShow = b.IsTaskerNoShow,
         AutoConfirmAt = b.AutoConfirmAt,
         CheckInPhotoUrl = b.CheckInPhotoUrl,
         CheckOutPhotoUrl = b.CheckOutPhotoUrl,
@@ -51,5 +55,6 @@ public static class BookingMapper
         CanDispute = DisputeService.CanDispute(b, nowUtc, disputeHours),
         CustomerPhone = showContact ? b.Customer?.PhoneNumber : null,
         TaskerPhone = showContact ? b.Tasker?.PhoneNumber : null,
+        CanReview = canReview,
     };
 }

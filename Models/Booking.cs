@@ -51,6 +51,10 @@ public class Booking
     public bool IsAutoConfirmed { get; set; }
     public DateTime? AutoConfirmReminderSentAt { get; set; } // đã nhắc khách trước hạn tự xác nhận
 
+    // US37 – Tasker không đến (quá 30 phút sau giờ hẹn chưa Bắt đầu)
+    public bool IsTaskerNoShow { get; set; }
+    public DateTime? NoShowAt { get; set; }
+
     // US14 – phí hủy đã tính khi khách hủy (BR-C01)
     public decimal CancellationFee { get; set; }
 

@@ -183,8 +183,9 @@ public class MatchingService
         if (booking.Latitude is null || booking.Longitude is null) return new();
 
         // Tasker đã được mời trong vòng ghép hiện tại → không gửi lại (BR-M03)
+        // + loại Tasker từng nhận đơn này rồi không đến (FR-28: "ghép lại và loại Tasker cũ")
         var invited = await _db.BookingOffers
-            .Where(o => o.BookingId == booking.Id && o.Round == booking.MatchRound)
+            .Where(o => o.BookingId == booking.Id && (o.Round == booking.MatchRound || o.Status == OfferStatus.Accepted))
             .Select(o => o.TaskerId)
             .ToListAsync(ct);
 
