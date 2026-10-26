@@ -28,6 +28,9 @@ public class GeoService
     private readonly string _tileFolder;
     private readonly ILogger<GeoService> _logger;
 
+    /// <summary>Lỗi gần nhất khi gọi OpenStreetMap (hiện ở /api/geo/status để chẩn đoán).</summary>
+    public static string? LastError { get; private set; }
+
     public GeoService(IHttpClientFactory httpFactory, IMemoryCache cache, IOptions<MapProxyOptions> options,
         IWebHostEnvironment env, ILogger<GeoService> logger)
     {
@@ -63,22 +66,34 @@ public class GeoService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Tải ảnh bản đồ {Url} thất bại: {Status}", url, (int)response.StatusCode);
+                LastError = $"Ảnh bản đồ: OpenStreetMap trả mã {(int)response.StatusCode} {response.ReasonPhrase}";
                 return File.Exists(path) ? await File.ReadAllBytesAsync(path, ct) : null; // dùng tạm bản cũ
             }
             var bytes = await response.Content.ReadAsByteArrayAsync(ct);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             await File.WriteAllBytesAsync(path, bytes, ct);
+            LastError = null;
             return bytes;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
             _logger.LogWarning(ex, "Không tải được ảnh bản đồ {Z}/{X}/{Y}", z, x, y);
+            LastError = $"Ảnh bản đồ: {Describe(ex)}";
             return File.Exists(path) ? await File.ReadAllBytesAsync(path, CancellationToken.None) : null;
         }
         finally
         {
             gate.Release();
         }
+    }
+
+    /// <summary>Gom thông điệp lỗi kèm lỗi gốc (DNS, SSL, timeout...) thành 1 dòng.</summary>
+    private static string Describe(Exception ex)
+    {
+        if (ex is TaskCanceledException) return "Hết thời gian chờ (timeout) khi kết nối OpenStreetMap.";
+        var messages = new List<string>();
+        for (var e = ex; e is not null; e = e.InnerException) messages.Add(e.Message);
+        return string.Join(" -> ", messages.Distinct());
     }
 
     private bool IsFresh(string path) =>
@@ -154,6 +169,7 @@ public class GeoService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Tra địa chỉ {Url} thất bại: {Status}", url, (int)response.StatusCode);
+                LastError = $"Tra địa chỉ: Nominatim trả mã {(int)response.StatusCode} {response.ReasonPhrase}";
                 return null;
             }
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -163,6 +179,7 @@ public class GeoService
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
             _logger.LogWarning(ex, "Không tra được địa chỉ {Url}", url);
+            LastError = $"Tra địa chỉ: {Describe(ex)}";
             return null;
         }
         finally

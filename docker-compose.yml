@@ -32,6 +32,9 @@ services:
       Jwt__Key: "${JWT_KEY:-CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS}"
     ports:
       - "8080:8080"
+    dns: # DNS công cộng: tránh lỗi container không phân giải được tên miền (VPN, mạng trường...)
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - uploads_data:/app/wwwroot/uploads   # giữ ảnh đã tải lên khi build lại container
 

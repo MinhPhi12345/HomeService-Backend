@@ -27,6 +27,24 @@ public class GeoController : ControllerBase
         return bytes is null ? NotFound() : File(bytes, "image/png");
     }
 
+    // Kiểm tra nhanh Backend có ra được OpenStreetMap không (mở trên trình duyệt để chẩn đoán bản đồ trắng)
+    [HttpGet("status")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Status(CancellationToken ct)
+    {
+        var tiles = await _geo.GetTileAsync(0, 0, 0, ct) is not null;
+        var geocoder = (await _geo.SearchAsync("Hồ Chí Minh", ct)).Count > 0;
+        return Ok(new
+        {
+            tiles,
+            geocoder,
+            error = tiles && geocoder ? null : GeoService.LastError,
+            message = tiles && geocoder
+                ? "Backend tải được bản đồ và tra được địa chỉ."
+                : "Backend chưa kết nối được OpenStreetMap – kiểm tra Internet/tường lửa của máy chạy Backend.",
+        });
+    }
+
     // Toạ độ => địa chỉ gọn (để tự điền ô địa chỉ khi khách ghim vị trí)
     [HttpGet("reverse")]
     [Authorize]
