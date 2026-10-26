@@ -131,10 +131,21 @@ public class SettlementService
     /// Đơn tiền mặt hoàn thành, Tasker xác nhận đã thu đủ: ghi Payment (Success), trừ chiết khấu từ ví Tasker
     /// và giải phóng phần tạm giữ (FR-16 Luồng 1).
     /// </summary>
-    public async Task SettleCashAsync(Booking booking)
+    public async Task SettleCashAsync(Booking booking, bool allowPartialCommission = false)
     {
         var now = DateTime.UtcNow;
         var commission = Money.Commission(booking.TotalPrice, booking.CommissionRate);
+        if (allowPartialCommission && booking.TaskerId is not null)
+        {
+            // Ví không bao giờ âm (BR-P04): nếu số dư không đủ thì chỉ trừ phần đang có, ghi chú trong log kiểm toán
+            var balance = (await _wallet.GetProfileAsync(booking.TaskerId.Value)).WalletBalance;
+            if (balance < commission)
+            {
+                _audit.Add(AuditService.CashCommission, commission - balance, booking.Id, null,
+                    $"Ví Tasker không đủ, chiết khấu còn thiếu {commission - balance}");
+                commission = balance;
+            }
+        }
         var payment = new Payment
         {
             BookingId = booking.Id,

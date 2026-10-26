@@ -73,4 +73,16 @@ public class UsersController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    // US36 / BR-U01 - Admin mở lại (hoặc chặn) quyền thanh toán tiền mặt của khách
+    [HttpPut("{id:int}/cash-blocked")]
+    public async Task<IActionResult> SetCashBlocked(int id, [FromQuery] bool isCashBlocked)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null) return NotFound();
+        if (user.Role != UserRole.Customer) throw ApiException.BadRequest("Chỉ áp dụng cho tài khoản khách hàng.");
+        user.IsCashBlocked = isCashBlocked;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
 }

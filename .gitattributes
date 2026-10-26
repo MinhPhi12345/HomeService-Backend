@@ -1,0 +1,4 @@
+# Giữ ảnh/file nhị phân nguyên vẹn khi checkout trên Windows
+*.png binary
+*.jpg binary
+*.bundle binary

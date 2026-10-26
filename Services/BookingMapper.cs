@@ -16,10 +16,12 @@ public static class BookingMapper
         var finished = b.Status is BookingStatus.Completed or BookingStatus.Paid;
         var isParty = viewerId is not null && b.TaskerId is not null && (viewerId == b.TaskerId || viewerId == b.CustomerId);
         var canReview = finished && isParty && b.Reviews.All(r => r.ReviewerId != viewerId);
-        return Map(b, nowUtc, disputeHours, showContact, canReview);
+        var isCustomer = viewerId is not null && viewerId == b.CustomerId;
+        return Map(b, nowUtc, disputeHours, showContact, canReview, isCustomer);
     }
 
-    private static BookingResponse Map(Booking b, DateTime nowUtc, int disputeHours, bool showContact, bool canReview) => new()
+    private static BookingResponse Map(Booking b, DateTime nowUtc, int disputeHours, bool showContact, bool canReview,
+        bool isCustomer) => new()
     {
         Id = b.Id,
         ServiceCategoryName = b.ServiceCategory?.Name ?? string.Empty,
@@ -53,8 +55,10 @@ public static class BookingMapper
         CancellationFee = b.CancellationFee,
         DisputeId = b.Dispute?.Id,
         CanDispute = DisputeService.CanDispute(b, nowUtc, disputeHours),
-        CustomerPhone = showContact ? b.Customer?.PhoneNumber : null,
+        // Số liên hệ khách nhập khi đặt đơn được ưu tiên hơn SĐT trong hồ sơ
+        CustomerPhone = showContact ? b.ContactPhone ?? b.Customer?.PhoneNumber : null,
         TaskerPhone = showContact ? b.Tasker?.PhoneNumber : null,
         CanReview = canReview,
+        ContactPhone = isCustomer || showContact ? b.ContactPhone ?? b.Customer?.PhoneNumber : null,
     };
 }

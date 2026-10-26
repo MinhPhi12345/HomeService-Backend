@@ -181,6 +181,15 @@ public class BookingsController : ControllerBase
         return NoContent();
     }
 
+    // US36 - Tasker báo khách chưa thanh toán tiền mặt (thay cho bước Hoàn thành)
+    [HttpPost("{id:int}/report-unpaid")]
+    [Authorize(Roles = Roles.Tasker)]
+    public async Task<IActionResult> ReportUnpaid(int id, ReportUnpaidRequest request)
+    {
+        await _bookingService.ReportUnpaidAsync(id, CurrentUserId, request);
+        return NoContent();
+    }
+
     // US19 - Tasker gửi vị trí (polling ~15 giây) khi đơn đang Accepted/InProgress
     [HttpPut("{id:int}/location")]
     [Authorize(Roles = Roles.Tasker)]

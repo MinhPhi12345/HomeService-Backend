@@ -22,6 +22,8 @@ public class Booking
     public double? Longitude { get; set; }
 
     public string? Note { get; set; }
+    // SĐT liên hệ cho riêng đơn này (khách nhập khi đặt; bỏ trống => lấy SĐT hồ sơ lúc đặt)
+    public string? ContactPhone { get; set; }
     public int Quantity { get; set; } = 1;        // số giờ / số lần (1–12)
     public decimal TotalPrice { get; set; }       // = basePrice × quantity (BR-B01)
 
@@ -54,6 +56,9 @@ public class Booking
     // US37 – Tasker không đến (quá 30 phút sau giờ hẹn chưa Bắt đầu)
     public bool IsTaskerNoShow { get; set; }
     public DateTime? NoShowAt { get; set; }
+
+    // US29 – đã gửi nhắc lịch trước giờ hẹn
+    public DateTime? ReminderSentAt { get; set; }
 
     // US14 – phí hủy đã tính khi khách hủy (BR-C01)
     public decimal CancellationFee { get; set; }

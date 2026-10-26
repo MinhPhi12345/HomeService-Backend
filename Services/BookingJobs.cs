@@ -22,11 +22,13 @@ public class BookingJobs
     private readonly CancellationService _cancellation;
     private readonly TaskerDisciplineService _discipline;
     private readonly WalletService _wallet;
+    private readonly NotificationOptions _notificationOptions;
 
     public BookingJobs(AppDbContext db, INotificationService notifications, SettlementService settlement,
         IOptions<SettlementOptions> options, ILogger<BookingJobs> logger, CancellationService cancellation,
-        TaskerDisciplineService discipline, WalletService wallet)
+        TaskerDisciplineService discipline, WalletService wallet, IOptions<NotificationOptions> notificationOptions)
     {
+        _notificationOptions = notificationOptions.Value;
         _discipline = discipline;
         _wallet = wallet;
         _cancellation = cancellation;
@@ -225,5 +227,26 @@ public class BookingJobs
                 _db.ChangeTracker.Clear();
             }
         }
+    }
+
+    /// <summary>US29 – nhắc lịch trước giờ hẹn (mặc định 1 tiếng) cho Khách hàng và Tasker, mỗi đơn 1 lần.</summary>
+    public async Task SendAppointmentRemindersAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var until = now.AddMinutes(_notificationOptions.AppointmentReminderMinutes);
+        var bookings = await _db.Bookings
+            .Include(b => b.ServiceCategory)
+            .Where(b => b.Status == BookingStatus.Accepted && b.TaskerId != null && !b.IsTaskerNoShow
+                        && b.ReminderSentAt == null && b.ScheduledTime > now && b.ScheduledTime <= until)
+            .Take(100)
+            .ToListAsync(ct);
+        foreach (var b in bookings)
+        {
+            b.ReminderSentAt = now;
+            var when = VnTime.Format(b.ScheduledTime);
+            _notifications.Add(b.CustomerId, "Nhắc lịch hẹn", $"Đơn {b.ServiceCategory!.Name} sẽ bắt đầu lúc {when}.");
+            _notifications.Add(b.TaskerId!.Value, "Nhắc lịch làm việc", $"Bạn có đơn {b.ServiceCategory.Name} tại {b.Address} lúc {when}.");
+        }
+        if (bookings.Count > 0) await _db.SaveChangesAsync(ct);
     }
 }

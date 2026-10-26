@@ -40,7 +40,8 @@ public class DisputeService
         if (now > b.CompletedAt.Value.AddHours(disputeHours)) return false;
         var onlineWaiting = b.Status == BookingStatus.Completed && b.PaymentMethod != PaymentMethod.Cash;
         var cashPaid = b.Status == BookingStatus.Paid && b.PaymentMethod == PaymentMethod.Cash;
-        return onlineWaiting || cashPaid;
+        var unpaidReported = b.Status == BookingStatus.PaymentOverdue; // US36: khách cho rằng đã trả tiền mặt
+        return onlineWaiting || cashPaid || unpaidReported;
     }
 
     public async Task<Dispute> CreateAsync(int bookingId, int customerId, CreateDisputeRequest request)
@@ -103,6 +104,14 @@ public class DisputeService
         if (!Enum.IsDefined(resolution)) throw ApiException.BadRequest("Kết quả xử lý không hợp lệ.");
         var isCash = booking.PaymentMethod == PaymentMethod.Cash;
         var amount = booking.Payment?.Amount ?? booking.TotalPrice;
+
+        // US36 – khiếu nại về việc "khách chưa thanh toán": chỉ bác (giữ khoản nợ) hoặc hủy nợ (resolution 2)
+        var isUnpaidDispute = isCash && booking.Payment is null;
+        if (isUnpaidDispute)
+        {
+            await ResolveUnpaidDisputeAsync(dispute, booking, adminId, request);
+            return;
+        }
 
         // Đơn tiền mặt: hệ thống không giữ tiền nên chỉ bác khiếu nại hoặc yêu cầu làm lại (BR-D01)
         if (isCash && resolution is DisputeResolution.PartialRefund or DisputeResolution.FullRefund)
@@ -184,6 +193,50 @@ public class DisputeService
         foreach (var userId in new[] { dispute.CustomerId, dispute.TaskerId })
             _notifications.Add(userId, "Kết quả xử lý khiếu nại", $"Đơn #{booking.Id}: {resultText}");
 
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+    }
+
+    /// <summary>
+    /// FR-27 bước 4: khách cho rằng đã trả tiền mặt. Admin xác minh:
+    /// 0 = bác khiếu nại (nợ giữ nguyên, đơn về 13); 2 = hủy khoản nợ (khách đã trả): đơn → 5 Paid, trừ chiết khấu
+    /// từ ví Tasker như đơn tiền mặt bình thường, Tasker báo sai bị +2 điểm vi phạm (BR-D02).
+    /// </summary>
+    private async Task ResolveUnpaidDisputeAsync(Dispute dispute, Booking booking, int adminId, ResolveDisputeRequest request)
+    {
+        var resolution = request.Resolution!.Value;
+        if (resolution != DisputeResolution.ReleaseFull && resolution != DisputeResolution.FullRefund)
+            throw ApiException.BadRequest("Khiếu nại về thanh toán chỉ có thể bác (0) hoặc hủy khoản nợ (2).");
+
+        var now = DateTime.UtcNow;
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        string resultText;
+        if (resolution == DisputeResolution.ReleaseFull)
+        {
+            booking.Status = BookingStatus.PaymentOverdue;
+            resultText = "Khiếu nại bị bác, khoản nợ vẫn được giữ.";
+        }
+        else
+        {
+            var customer = await _db.Users.FirstAsync(u => u.Id == booking.CustomerId);
+            customer.OutstandingAmount = Math.Max(0, customer.OutstandingAmount - booking.TotalPrice);
+            customer.UnpaidReportCount = Math.Max(0, customer.UnpaidReportCount - 1);
+            if (customer.UnpaidReportCount < 2) customer.IsCashBlocked = false;
+
+            await _settlement.SettleCashAsync(booking, allowPartialCommission: true); // khách đã trả tiền mặt cho Tasker
+            await _discipline.AddViolationAsync(dispute.TaskerId, 2, $"báo sai \"khách không thanh toán\" ở đơn #{booking.Id}");
+            resultText = "Đã hủy khoản nợ vì xác minh khách đã thanh toán tiền mặt.";
+        }
+        booking.UpdatedAt = now;
+        dispute.Status = DisputeStatus.Resolved;
+        dispute.Resolution = resolution;
+        dispute.AdminNote = request.AdminNote.Trim();
+        dispute.ResolvedById = adminId;
+        dispute.ResolvedAt = now;
+        _audit.Add(AuditService.DisputeResolved, resolution == DisputeResolution.FullRefund ? booking.TotalPrice : 0,
+            booking.Id, null, $"Khiếu nại thanh toán #{dispute.Id}: {resolution} – {dispute.AdminNote}");
+        foreach (var userId in new[] { dispute.CustomerId, dispute.TaskerId })
+            _notifications.Add(userId, "Kết quả xử lý khiếu nại", $"Đơn #{booking.Id}: {resultText}");
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
     }
