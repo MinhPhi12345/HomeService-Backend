@@ -22,6 +22,8 @@ public class Booking
     public double? Longitude { get; set; }
 
     public string? Note { get; set; }
+    // SĐT liên hệ cho riêng đơn này (khách nhập khi đặt; bỏ trống => lấy SĐT hồ sơ lúc đặt)
+    public string? ContactPhone { get; set; }
     public int Quantity { get; set; } = 1;        // số giờ / số lần (1–12)
     public decimal TotalPrice { get; set; }       // = basePrice × quantity (BR-B01)
 

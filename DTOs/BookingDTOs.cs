@@ -30,6 +30,10 @@ public class CreateBookingRequest
 
     /// <summary>Bắt buộc true khi chọn tiền mặt (khách cam kết có mặt lúc hoàn thành).</summary>
     public bool? CustomerPresent { get; set; }
+
+    /// <summary>Bổ sung: SĐT để Tasker liên hệ cho đơn này (0 + 9 số). Bỏ trống => dùng SĐT trong hồ sơ.</summary>
+    [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại liên hệ không hợp lệ.")]
+    public string? ContactPhone { get; set; }
 }
 
 // US18 – body của PUT /api/bookings/{id}/status
@@ -90,6 +94,8 @@ public class BookingResponse
     public string? TaskerPhone { get; init; }
     /// <summary>US15/US25/US26 – người đang xem còn đánh giá được đơn này không (đơn hoàn thành & chưa đánh giá).</summary>
     public bool CanReview { get; init; }
+    /// <summary>Bổ sung: SĐT liên hệ của đơn – khách luôn thấy; Tasker chỉ thấy khi đơn đang 2/3 (giống customerPhone).</summary>
+    public string? ContactPhone { get; init; }
 }
 
 // US14 – GET /api/bookings/{id}/cancellation-fee

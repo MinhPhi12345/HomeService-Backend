@@ -103,6 +103,11 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(15)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(15)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 

@@ -34,12 +34,23 @@ builder.Services.AddScoped<BookingJobs>();
 builder.Services.AddScoped<CancellationService>();
 builder.Services.AddScoped<TaskerDisciplineService>();
 builder.Services.AddScoped<DisputeService>();
+// Bản đồ & tra địa chỉ OpenStreetMap đi qua Backend (cache + User-Agent riêng)
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient(GeoService.HttpClientName, (sp, client) =>
+{
+    var map = builder.Configuration.GetSection(MapProxyOptions.Section).Get<MapProxyOptions>() ?? new MapProxyOptions();
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(map.UserAgent);
+    client.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddSingleton<GeoService>();
 
 // --- Cấu hình nghiệp vụ (appsettings.json) ---
 builder.Services.Configure<BusinessOptions>(builder.Configuration.GetSection(BusinessOptions.Section));
 builder.Services.Configure<MatchingOptions>(builder.Configuration.GetSection(MatchingOptions.Section));
 builder.Services.Configure<SettlementOptions>(builder.Configuration.GetSection(SettlementOptions.Section));
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.Section));
+builder.Services.Configure<MapProxyOptions>(builder.Configuration.GetSection(MapProxyOptions.Section));
 
 // --- Tác vụ nền: ghép nối theo đợt, hết hạn thanh toán, tự xác nhận... ---
 builder.Services.AddHostedService<BookingWorker>();

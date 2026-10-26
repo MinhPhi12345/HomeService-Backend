@@ -106,6 +106,7 @@ public class AppDbContext : DbContext
         {
             e.Property(b => b.Address).HasMaxLength(255);
             e.Property(b => b.Note).HasMaxLength(500);
+            e.Property(b => b.ContactPhone).HasMaxLength(15).IsUnicode(false);
             e.Property(b => b.CommissionRate).HasPrecision(5, 4);
             e.HasIndex(b => new { b.Status, b.NextMatchAt });
             e.HasIndex(b => new { b.TaskerId, b.Status });

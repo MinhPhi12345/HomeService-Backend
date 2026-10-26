@@ -10,6 +10,9 @@ Theo quy tắc của SRS ("code phải theo SRS; muốn khác thì cập nhật 
 | `DELETE /api/reviews/{id}` | A | Admin gỡ đánh giá bất thường, tính lại điểm TB Tasker | US27 |
 | `PUT /api/servicecategories/{id}/restore` | A | Khôi phục dịch vụ đã xóa mềm | US09 |
 | `PUT /api/users/{id}/cash-blocked?isCashBlocked=` | A | Admin mở lại/chặn thanh toán tiền mặt của khách (BR-U01 "Admin có thể mở lại") | US36 |
+| `GET /api/geo/tiles/{z}/{x}/{y}.png` | Không cần | Ảnh nền bản đồ OpenStreetMap đi qua Backend (cache 14 ngày, User-Agent riêng) – app/web không cần API key | US13, US19 |
+| `GET /api/geo/reverse?lat=&lng=` | Auth | Toạ độ ⇒ địa chỉ gọn (Nominatim) để tự điền ô địa chỉ | US13 |
+| `GET /api/geo/search?q=` | Auth | Địa chỉ ⇒ danh sách vị trí ở Việt Nam (tối đa 6) | US13 |
 
 ## 2. Query tùy chọn mới (không gửi thì hoạt động như cũ)
 
@@ -28,7 +31,8 @@ Theo quy tắc của SRS ("code phải theo SRS; muốn khác thì cập nhật 
 
 | DTO | Field mới |
 |---|---|
-| `BookingResponse` | `serviceCategoryId, note, quantity, latitude, longitude, updatedAt, matchRound, currentWave, cancellationFee, disputeId, customerPhone, taskerPhone, canReview` (`customerPhone/taskerPhone` chỉ có giá trị với 2 bên của đơn khi đơn đang 2/3) |
+| `CreateBookingRequest` | `contactPhone` (tùy chọn, `^0\d{9}$`): SĐT để Tasker liên hệ cho đơn; bỏ trống => lấy SĐT hồ sơ lúc đặt |
+| `BookingResponse` | `serviceCategoryId, note, quantity, latitude, longitude, updatedAt, matchRound, currentWave, cancellationFee, disputeId, customerPhone, taskerPhone, canReview, contactPhone` (`customerPhone/taskerPhone` chỉ có giá trị với 2 bên của đơn khi đơn đang 2/3; `customerPhone` ưu tiên số liên hệ của đơn; `contactPhone` khách luôn thấy, Tasker thấy khi đơn 2/3) |
 | `OfferResponse` | `wave, note, quantity, customerRatingAverage` |
 | `PendingTaskerItem` | `email, phoneNumber, idCardImageUrl, baseAddress, baseLatitude, baseLongitude, serviceRadiusKm, submittedAt` |
 | `AdminUserItem` | `outstandingAmount, isCashBlocked, unpaidReportCount, verificationStatus, ratingAverage, violationPoints, suspendedUntil` (null nếu không phải Tasker) |
@@ -43,7 +47,7 @@ Theo quy tắc của SRS ("code phải theo SRS; muốn khác thì cập nhật 
 ## 4. Bảng/cột mới trong database
 
 - Bảng `AuditLogs` (NFR-16): `Id, Action, BookingId, PaymentId, ActorUserId, Amount, Detail, CreatedAt`.
-- `Bookings`: 3 cột nội bộ (không trả ra API) `AutoConfirmReminderSentAt` (đã nhắc trước hạn tự xác nhận), `NoShowAt` (mốc tự hủy 2 giờ sau khi Tasker không đến), `ReminderSentAt` (đã nhắc lịch hẹn). Các cột "dự kiến" khác trong SRS 7.4 đã được tạo đúng tên.
+- `Bookings`: cột `ContactPhone varchar(15)` (SĐT liên hệ của đơn) và 3 cột nội bộ (không trả ra API) `AutoConfirmReminderSentAt` (đã nhắc trước hạn tự xác nhận), `NoShowAt` (mốc tự hủy 2 giờ sau khi Tasker không đến), `ReminderSentAt` (đã nhắc lịch hẹn). Các cột "dự kiến" khác trong SRS 7.4 đã được tạo đúng tên.
 - `TaskerProfiles`: `SubmittedAt` (sắp xếp danh sách chờ duyệt).
 - `Disputes`: `TaskerRespondedAt`.
 - `Reviews`: UNIQUE `(BookingId, ReviewerId)` và CHECK `Rating BETWEEN 1 AND 5`.

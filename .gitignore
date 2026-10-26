@@ -26,3 +26,4 @@ Thumbs.db
 ## Ảnh người dùng tải lên (chỉ giữ thư mục)
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep
+tile-cache/

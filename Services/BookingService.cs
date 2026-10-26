@@ -87,6 +87,9 @@ public class BookingService : IBookingService
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+            ContactPhone = string.IsNullOrWhiteSpace(request.ContactPhone)
+                ? customer.PhoneNumber
+                : request.ContactPhone.Trim(),
             Quantity = quantity,
             TotalPrice = totalPrice,
             PaymentMethod = method,
