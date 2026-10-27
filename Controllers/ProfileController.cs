@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.DTOs;
 using HomeService.Api.Extensions;
@@ -38,7 +39,7 @@ public class ProfileController : ControllerBase
         user.FullName = request.FullName.Trim();
         user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
         user.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
-        user.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+        user.AvatarUrl = UploadUrl.Normalize(request.AvatarUrl);
         await _db.SaveChangesAsync();
         return Ok(ToResponse(user));
     }

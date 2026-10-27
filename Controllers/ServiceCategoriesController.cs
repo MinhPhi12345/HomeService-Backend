@@ -66,7 +66,7 @@ public class ServiceCategoriesController : ControllerBase
             Description = NullIfEmpty(request.Description),
             BasePrice = request.BasePrice,
             Unit = request.Unit,
-            IconUrl = NullIfEmpty(request.IconUrl),
+            IconUrl = UploadUrl.Normalize(request.IconUrl),
         };
         _db.ServiceCategories.Add(entity);
         await _db.SaveChangesAsync();
@@ -88,7 +88,7 @@ public class ServiceCategoriesController : ControllerBase
         entity.Description = NullIfEmpty(request.Description);
         entity.BasePrice = request.BasePrice;
         entity.Unit = request.Unit;
-        entity.IconUrl = NullIfEmpty(request.IconUrl);
+        entity.IconUrl = UploadUrl.Normalize(request.IconUrl);
 
         await _db.SaveChangesAsync();
         return NoContent();

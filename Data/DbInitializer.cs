@@ -1,3 +1,4 @@
+using HomeService.Api.Common;
 using HomeService.Api.Enums;
 using HomeService.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,48 @@ public static class DbInitializer
         }
 
         await SeedAdminAsync(db, config, logger);
+        await NormalizeUploadUrlsAsync(db, logger);
         if (config.GetValue("Seed:SampleData", true)) await SeedSampleServicesAsync(db);
+    }
+
+    /// <summary>
+    /// Chuyển ảnh cũ đã lưu dạng "http://localhost:8080/uploads/…" sang "/uploads/…" (chạy mỗi lần khởi động,
+    /// chỉ cập nhật bản ghi còn dạng cũ) – để ảnh tải lên lúc chạy máy cá nhân vẫn hiện sau khi deploy.
+    /// </summary>
+    private static async Task NormalizeUploadUrlsAsync(AppDbContext db, ILogger logger)
+    {
+        const string marker = "/uploads/";
+        var changed = 0;
+
+        foreach (var s in await db.ServiceCategories.Where(x => x.IconUrl != null && x.IconUrl.Contains(marker)).ToListAsync())
+            if (UploadUrl.NeedsNormalize(s.IconUrl)) { s.IconUrl = UploadUrl.Normalize(s.IconUrl); changed++; }
+
+        foreach (var u in await db.Users.Where(x => x.AvatarUrl != null && x.AvatarUrl.Contains(marker)).ToListAsync())
+            if (UploadUrl.NeedsNormalize(u.AvatarUrl)) { u.AvatarUrl = UploadUrl.Normalize(u.AvatarUrl); changed++; }
+
+        foreach (var p in await db.TaskerProfiles.Where(x => x.IdCardImageUrl != null && x.IdCardImageUrl.Contains(marker)).ToListAsync())
+            if (UploadUrl.NeedsNormalize(p.IdCardImageUrl)) { p.IdCardImageUrl = UploadUrl.Normalize(p.IdCardImageUrl); changed++; }
+
+        foreach (var b in await db.Bookings.Where(x => (x.CheckInPhotoUrl != null && x.CheckInPhotoUrl.Contains(marker))
+                     || (x.CheckOutPhotoUrl != null && x.CheckOutPhotoUrl.Contains(marker))).ToListAsync())
+        {
+            if (UploadUrl.NeedsNormalize(b.CheckInPhotoUrl)) { b.CheckInPhotoUrl = UploadUrl.Normalize(b.CheckInPhotoUrl); changed++; }
+            if (UploadUrl.NeedsNormalize(b.CheckOutPhotoUrl)) { b.CheckOutPhotoUrl = UploadUrl.Normalize(b.CheckOutPhotoUrl); changed++; }
+        }
+
+        foreach (var d in await db.Disputes.Where(x => x.EvidenceUrls.Contains(marker)
+                     || (x.TaskerEvidenceUrls != null && x.TaskerEvidenceUrls.Contains(marker))).ToListAsync())
+        {
+            var ev = UploadUrl.NormalizeJoined(d.EvidenceUrls) ?? string.Empty;
+            var tev = UploadUrl.NormalizeJoined(d.TaskerEvidenceUrls);
+            if (ev != d.EvidenceUrls || tev != d.TaskerEvidenceUrls) { d.EvidenceUrls = ev; d.TaskerEvidenceUrls = tev; changed++; }
+        }
+
+        if (changed > 0)
+        {
+            await db.SaveChangesAsync();
+            logger.LogInformation("Đã chuẩn hóa {Count} đường dẫn ảnh sang dạng /uploads/…", changed);
+        }
     }
 
     private static async Task SeedAdminAsync(AppDbContext db, IConfiguration config, ILogger logger)

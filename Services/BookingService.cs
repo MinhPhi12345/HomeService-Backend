@@ -138,7 +138,7 @@ public class BookingService : IBookingService
 
         var now = DateTime.UtcNow;
         var target = request.Status!.Value;
-        var photo = string.IsNullOrWhiteSpace(request.PhotoUrl) ? null : request.PhotoUrl.Trim();
+        var photo = UploadUrl.Normalize(request.PhotoUrl);
 
         if (target == BookingStatus.InProgress && booking.Status == BookingStatus.Accepted)
         {
@@ -268,7 +268,7 @@ public class BookingService : IBookingService
         var now = DateTime.UtcNow;
         await using var tx = await _db.Database.BeginTransactionAsync();
         booking.Status = BookingStatus.PaymentOverdue;
-        booking.CheckOutPhotoUrl = request.PhotoUrl.Trim();
+        booking.CheckOutPhotoUrl = UploadUrl.Normalize(request.PhotoUrl);
         booking.CompletedAt = now; // mốc 24 giờ để khách khiếu nại nếu cho rằng đã trả
         booking.UpdatedAt = now;
 

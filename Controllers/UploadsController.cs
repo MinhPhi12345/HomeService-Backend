@@ -50,7 +50,8 @@ public class UploadsController : ControllerBase
             await file.CopyToAsync(output);
         }
 
-        var url = $"{Request.Scheme}://{Request.Host}/uploads/{subFolder}/{fileName}";
+        // Đường dẫn tương đối – không gắn tên máy để ảnh không "chết" khi deploy / đổi tên miền (xem UploadUrl)
+        var url = $"/uploads/{subFolder}/{fileName}";
         return StatusCode(StatusCodes.Status201Created, new UploadResponse(url));
     }
 

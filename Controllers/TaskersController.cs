@@ -50,7 +50,7 @@ public class TaskersController : ControllerBase
                             || profile.IdCardImageUrl != request.IdCardImageUrl;
 
         profile.IdCardNumber = request.IdCardNumber;
-        profile.IdCardImageUrl = request.IdCardImageUrl;
+        profile.IdCardImageUrl = UploadUrl.Normalize(request.IdCardImageUrl);
         profile.Skills = string.IsNullOrWhiteSpace(request.Skills) ? null : request.Skills.Trim();
         profile.WorkingArea = request.WorkingArea.Trim();
         profile.BaseAddress = request.BaseAddress.Trim();
