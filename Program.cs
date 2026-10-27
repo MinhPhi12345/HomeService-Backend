@@ -6,13 +6,25 @@ using HomeService.Api.Options;
 using HomeService.Api.Services;
 using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-// Thư mục lưu ảnh tải lên (POST /api/uploads) – tạo trước để UseStaticFiles phục vụ được
-Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
-
 var builder = WebApplication.CreateBuilder(args);
+
+// Thư mục lưu ảnh tải lên (POST /api/uploads) – cấu hình Storage:UploadsPath, tạo trước để phục vụ /uploads/...
+var uploadsPath = StorageOptions.ResolveUploadsPath(builder.Configuration, builder.Environment.ContentRootPath);
+Directory.CreateDirectory(uploadsPath);
+builder.Services.Configure<StorageOptions>(o => o.UploadsPath = uploadsPath);
+
+// Chạy sau reverse proxy HTTPS (Azure App Service, Nginx…): nhận đúng scheme/IP gốc của người dùng
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
 
 // --- Database (SQL Server) ---
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -133,19 +145,28 @@ var app = builder.Build();
 // Tự áp dụng migration + tạo tài khoản Admin mặc định
 await DbInitializer.InitializeAsync(app.Services);
 
+app.UseForwardedHeaders();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-if (app.Environment.IsDevelopment())
+// Swagger: luôn bật khi Development; bản deploy bật bằng Swagger__Enabled=true (để demo / chấm đồ án)
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles(); // phục vụ ảnh đã tải lên: /uploads/...
+app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions // ảnh đã tải lên: /uploads/...
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads",
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public,max-age=604800",
+});
 app.UseCors("Default");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })); // Azure Health check / kiểm tra nhanh khi deploy
 
 app.Run();

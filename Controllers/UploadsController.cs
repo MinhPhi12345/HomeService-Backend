@@ -2,6 +2,8 @@ using HomeService.Api.Common;
 using HomeService.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using HomeService.Api.Options;
 
 namespace HomeService.Api.Controllers;
 
@@ -13,11 +15,11 @@ namespace HomeService.Api.Controllers;
 public class UploadsController : ControllerBase
 {
     private const long MaxBytes = 5 * 1024 * 1024;
-    private readonly IWebHostEnvironment _env;
+    private readonly string _uploadsRoot;
 
-    public UploadsController(IWebHostEnvironment env)
+    public UploadsController(IOptions<StorageOptions> storage, IWebHostEnvironment env)
     {
-        _env = env;
+        _uploadsRoot = storage.Value.UploadsPath ?? Path.Combine(env.ContentRootPath, "wwwroot", "uploads");
     }
 
     [HttpPost]
@@ -39,9 +41,8 @@ public class UploadsController : ControllerBase
         var extension = DetectImageExtension(header)
             ?? throw ApiException.BadRequest("Chỉ hỗ trợ ảnh JPG hoặc PNG.");
 
-        var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
         var subFolder = DateTime.UtcNow.ToString("yyyyMM");
-        var folder = Path.Combine(webRoot, "uploads", subFolder);
+        var folder = Path.Combine(_uploadsRoot, subFolder);
         Directory.CreateDirectory(folder);
 
         var fileName = $"{Guid.NewGuid():N}{extension}";
