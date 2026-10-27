@@ -134,6 +134,78 @@ public class ReportsController : ControllerBase
         return Ok(result);
     }
 
+    // Drill-down US31 – các giao dịch tạo nên doanh thu. ?period=2026-10-16 | 2026-10 | 2026 (giờ VN) để xem 1 cột biểu đồ
+    [HttpGet("revenue/transactions")]
+    public async Task<ActionResult<PagedResult<RevenueTransactionItem>>> GetRevenueTransactions([FromQuery] DateTime? from,
+        [FromQuery] DateTime? to, [FromQuery] string? period, [FromQuery] int? page, [FromQuery] int? pageSize)
+    {
+        var (f, t) = Range(from, to);
+        var (p, size) = Paging.Normalize(page, pageSize);
+        var rows = await _db.Payments.AsNoTracking()
+            .Where(x => FinishedStatuses.Contains(x.Status))
+            .Select(x => new
+            {
+                x.Id, x.BookingId, Service = x.Booking!.ServiceCategory!.Name, Customer = x.Booking.Customer!.FullName,
+                Tasker = x.Booking.Tasker != null ? x.Booking.Tasker.FullName : null,
+                x.Method, x.Status, x.Amount, x.RefundedAmount, x.CommissionAmount, x.TaskerAmount,
+                At = x.ReleasedAt ?? x.RefundedAt ?? x.PaidAt,
+            })
+            .ToListAsync();
+
+        var filtered = rows.Where(x => x.At >= f && x.At <= t);
+        if (!string.IsNullOrWhiteSpace(period))
+        {
+            var key = period.Trim();
+            var group = key.Length switch { 4 => "year", 7 => "month", _ => "day" };
+            filtered = filtered.Where(x => Period(x.At!.Value, group) == key);
+        }
+        var list = filtered.OrderByDescending(x => x.At).ToList();
+        var items = list.Skip((p - 1) * size).Take(size)
+            .Select(x => new RevenueTransactionItem(x.Id, x.BookingId, x.Service, x.Customer, x.Tasker, x.Method, x.Status,
+                x.Amount, x.RefundedAmount, x.Amount - x.RefundedAmount, x.CommissionAmount, x.TaskerAmount, x.At!.Value))
+            .ToList();
+        return Ok(new PagedResult<RevenueTransactionItem>(items, p, size, list.Count));
+    }
+
+    // Drill-down US32 – danh sách đơn theo ngày tạo, lọc ?status= (số) hoặc ?taskerId= (đơn của 1 Tasker theo ngày hẹn)
+    [HttpGet("bookings")]
+    public async Task<ActionResult<PagedResult<ReportBookingItem>>> GetBookings([FromQuery] DateTime? from, [FromQuery] DateTime? to,
+        [FromQuery] BookingStatus? status, [FromQuery] int? taskerId, [FromQuery] string? keyword,
+        [FromQuery] int? page, [FromQuery] int? pageSize)
+    {
+        var (p, size) = Paging.Normalize(page, pageSize);
+        var query = _db.Bookings.AsNoTracking().AsQueryable();
+        if (taskerId is not null)
+        {
+            // Hiệu suất Tasker không giới hạn ngày khi không truyền from/to
+            query = query.Where(b => b.TaskerId == taskerId);
+            if (from is not null) { var f0 = DateTimeHelper.ToUtc(from.Value); query = query.Where(b => b.ScheduledTime >= f0); }
+            if (to is not null) { var t0 = DateTimeHelper.ToUtc(to.Value); query = query.Where(b => b.ScheduledTime <= t0); }
+        }
+        else
+        {
+            var (f, t) = Range(from, to);
+            query = query.Where(b => b.CreatedAt >= f && b.CreatedAt <= t);
+        }
+        if (status is not null) query = query.Where(b => b.Status == status);
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var kw = keyword.Trim();
+            query = query.Where(b => b.Customer!.FullName.Contains(kw) || b.Address.Contains(kw)
+                || b.ServiceCategory!.Name.Contains(kw) || (b.Tasker != null && b.Tasker.FullName.Contains(kw)));
+        }
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(b => b.CreatedAt).ThenByDescending(b => b.Id)
+            .Skip((p - 1) * size).Take(size)
+            .Select(b => new ReportBookingItem(b.Id, b.ServiceCategory!.Name, b.Customer!.FullName,
+                b.Tasker != null ? b.Tasker.FullName : null, b.Status, b.PaymentMethod, b.TotalPrice,
+                b.ScheduledTime, b.CreatedAt, b.Address))
+            .ToListAsync();
+        return Ok(new PagedResult<ReportBookingItem>(items, p, size, total));
+    }
+
     private static (DateTime From, DateTime To) Range(DateTime? from, DateTime? to)
     {
         var t = to is null ? DateTime.UtcNow : DateTimeHelper.ToUtc(to.Value);

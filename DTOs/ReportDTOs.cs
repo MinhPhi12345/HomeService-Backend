@@ -40,3 +40,33 @@ public record TaskerPerformanceItem(
     int ViolationPoints,
     decimal TotalEarnings
 );
+
+// Drill-down báo cáo (Admin nhấn vào cột / lát biểu đồ để xem bản ghi chi tiết)
+public record ReportBookingItem(
+    int Id,
+    string ServiceName,
+    string CustomerName,
+    string? TaskerName,
+    BookingStatus Status,
+    PaymentMethod PaymentMethod,
+    decimal TotalPrice,
+    DateTime ScheduledTime,
+    DateTime CreatedAt,
+    string Address
+);
+
+public record RevenueTransactionItem(
+    int PaymentId,
+    int BookingId,
+    string ServiceName,
+    string CustomerName,
+    string? TaskerName,
+    PaymentMethod Method,
+    PaymentStatus Status,
+    decimal Amount,
+    decimal RefundedAmount,
+    decimal Revenue,
+    decimal Commission,
+    decimal TaskerAmount,
+    DateTime At
+);
