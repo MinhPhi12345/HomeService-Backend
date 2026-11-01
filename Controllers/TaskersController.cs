@@ -28,15 +28,13 @@ public class TaskersController : ControllerBase
         _notifications = notifications;
     }
 
-    // US04 - Tasker gửi / cập nhật hồ sơ (CCCD, kỹ năng, khu vực, điểm làm việc, bán kính phục vụ)
+    // US04 - Tasker gửi / cập nhật hồ sơ (CCCD, kỹ năng, điểm làm việc, bán kính phục vụ; khu vực tự lấy từ địa chỉ)
     [HttpPost("profile")]
     [Authorize(Roles = Roles.Tasker)]
     public async Task<ActionResult<TaskerProfileResponse>> SubmitProfile(TaskerProfileRequest request)
     {
         if (!AllowedRadiusKm.Contains(request.ServiceRadiusKm!.Value))
             throw ApiException.BadRequest("Bán kính phục vụ không hợp lệ.");
-        if (!WorkingAreas.IsValid(request.WorkingArea))
-            throw ApiException.BadRequest("Khu vực làm việc không hợp lệ.");
 
         var userId = User.GetUserId();
         var profile = await _db.TaskerProfiles.FirstOrDefaultAsync(t => t.UserId == userId);
@@ -52,8 +50,10 @@ public class TaskersController : ControllerBase
         profile.IdCardNumber = request.IdCardNumber;
         profile.IdCardImageUrl = UploadUrl.Normalize(request.IdCardImageUrl);
         profile.Skills = string.IsNullOrWhiteSpace(request.Skills) ? null : request.Skills.Trim();
-        profile.WorkingArea = request.WorkingArea.Trim();
         profile.BaseAddress = request.BaseAddress.Trim();
+        // SRS 7.9: khu vực (nhãn hiển thị) lấy tự động từ địa chỉ điểm làm việc; app cũ còn gửi workingArea thì dùng làm dự phòng
+        profile.WorkingArea = WorkingAreas.FromAddress(profile.BaseAddress)
+                              ?? (string.IsNullOrWhiteSpace(request.WorkingArea) ? null : request.WorkingArea.Trim());
         profile.BaseLatitude = request.BaseLatitude!.Value;
         profile.BaseLongitude = request.BaseLongitude!.Value;
         profile.ServiceRadiusKm = request.ServiceRadiusKm.Value;
@@ -151,7 +151,7 @@ public class TaskersController : ControllerBase
         return NoContent();
     }
 
-    // US16 - Gợi ý danh sách Tasker đã duyệt theo khu vực (ghép nối tự động dùng tọa độ – MatchingService)
+    // US16 - Danh sách Tasker đã duyệt, lọc theo nhãn khu vực (ghép nối tự động KHÔNG dùng khu vực mà dùng tọa độ – MatchingService)
     [HttpGet("available")]
     public async Task<ActionResult<IEnumerable<AvailableTaskerItem>>> GetAvailable([FromQuery] string? area)
     {

@@ -173,21 +173,30 @@ public class UploadUrlTests
 
 public class WorkingAreasTests
 {
+    // SRS 7.9 – khu vực là nhãn lấy tự động từ địa chỉ điểm làm việc (định dạng của GeoService.FormatAddress)
     [Theory]
-    [InlineData("Quận 1", true)]
-    [InlineData("  Thủ Đức ", true)]
-    [InlineData("Quận 99", false)]
-    [InlineData("", false)]
-    [InlineData(null, false)]
-    public void IsValid(string? area, bool expected)
+    [InlineData("12 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh", "Quận 1")]
+    [InlineData("45 Lê Văn Khương, Phường Thới An, Quận 12, Thành phố Hồ Chí Minh, Việt Nam", "Quận 12")]
+    [InlineData("8 Trưng Nữ Vương, Xã Thới Tam Thôn, Huyện Hóc Môn, Thành phố Hồ Chí Minh", "Huyện Hóc Môn")]
+    [InlineData("1 Võ Văn Ngân, Phường Linh Chiểu, Thành phố Thủ Đức, Thành phố Hồ Chí Minh", "Thành phố Thủ Đức")]
+    [InlineData("135 Nam Kỳ Khởi Nghĩa, Phường Sài Gòn, Thành phố Hồ Chí Minh", "Phường Sài Gòn")]
+    [InlineData("Đường Tôn Đức Thắng, Đặc khu Côn Đảo, Thành phố Hồ Chí Minh", "Đặc khu Côn Đảo")]
+    [InlineData("12 Nguyễn Huệ,  Bến Nghé , TP.HCM, 700000", "Bến Nghé")]
+    [InlineData("Chợ Bến Thành", null)]
+    [InlineData("   ", null)]
+    [InlineData(null, null)]
+    public void FromAddress_LayNhanKhuVucTuDiaChi(string? address, string? expected)
     {
-        Assert.Equal(expected, WorkingAreas.IsValid(area));
+        Assert.Equal(expected, WorkingAreas.FromAddress(address));
     }
 
     [Fact]
-    public void All_Co11KhuVuc()
+    public void FromAddress_CatToiDa100KyTu()
     {
-        Assert.Equal(11, WorkingAreas.All.Length);
+        var area = WorkingAreas.FromAddress("1 Đường A, Phường " + new string('X', 200) + ", Thành phố Hồ Chí Minh");
+        Assert.NotNull(area);
+        Assert.Equal(WorkingAreas.MaxLength, area!.Length);
+        Assert.StartsWith("Phường X", area);
     }
 }
 

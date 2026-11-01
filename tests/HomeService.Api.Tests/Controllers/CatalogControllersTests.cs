@@ -158,7 +158,7 @@ public class TaskersControllerTests : TestBase
 {
     private TaskersController Controller() => new(Db, CreateNotifications());
 
-    private static TaskerProfileRequest ProfileRequest(string idCard = "079123456789", int radius = 5, string area = "Quận 1") => new()
+    private static TaskerProfileRequest ProfileRequest(string idCard = "079123456789", int radius = 5, string? area = "Quận 1") => new()
     {
         IdCardNumber = idCard,
         IdCardImageUrl = "http://localhost:8080/uploads/202610/cccd.png",
@@ -203,11 +203,28 @@ public class TaskersControllerTests : TestBase
     }
 
     [Fact]
-    public async Task SubmitProfile_KhuVucKhongHopLe_400()
+    public async Task SubmitProfile_KhuVucTuLayTuDiaChiDiemLamViec()
     {
         var tasker = Db.Tasker();
-        var ex = await Assert.ThrowsAsync<ApiException>(() => Controller().AsUser(tasker.Id, UserRole.Tasker).SubmitProfile(ProfileRequest(area: "Hà Nội")));
-        Assert.Equal("Khu vực làm việc không hợp lệ.", ex.Message);
+        var req = ProfileRequest(area: "Gò Vấp"); // app cũ còn gửi khu vực chọn tay – bị thay bằng khu vực theo địa chỉ
+        req.BaseAddress = "45 Lê Văn Khương, Phường Thới An, Quận 12, Thành phố Hồ Chí Minh";
+
+        var result = await Controller().AsUser(tasker.Id, UserRole.Tasker).SubmitProfile(req);
+
+        var body = Assert.IsType<TaskerProfileResponse>(Assert.IsAssignableFrom<ObjectResult>(result.Result).Value);
+        Assert.Equal("Quận 12", body.WorkingArea);
+        Assert.Equal("Quận 12", (await Fresh().TaskerProfiles.SingleAsync()).WorkingArea);
+    }
+
+    [Theory]
+    [InlineData(" Quận 1 ", "Quận 1")]
+    [InlineData(null, null)]
+    public async Task SubmitProfile_DiaChiKhongCoKhuVuc_DungKhuVucGuiKemHoacDeTrong(string? sent, string? expected)
+    {
+        var tasker = Db.Tasker();
+        var req = ProfileRequest(area: sent); // BaseAddress = "Chợ Bến Thành" – không suy ra được khu vực
+        await Controller().AsUser(tasker.Id, UserRole.Tasker).SubmitProfile(req);
+        Assert.Equal(expected, (await Fresh().TaskerProfiles.SingleAsync()).WorkingArea);
     }
 
     [Fact]

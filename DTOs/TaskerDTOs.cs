@@ -16,8 +16,9 @@ public class TaskerProfileRequest
     [MaxLength(500, ErrorMessage = "Kỹ năng tối đa 500 ký tự.")]
     public string? Skills { get; set; }
 
-    [Required(ErrorMessage = "Khu vực làm việc không hợp lệ.")]
-    public string WorkingArea { get; set; } = string.Empty;
+    // Không bắt buộc: Backend tự lấy khu vực từ BaseAddress (SRS 7.9). Chỉ dùng khi địa chỉ không suy ra được khu vực.
+    [MaxLength(100, ErrorMessage = "Khu vực tối đa 100 ký tự.")]
+    public string? WorkingArea { get; set; }
 
     [Required(ErrorMessage = "Vui lòng chọn điểm làm việc trên bản đồ.")]
     [StringLength(255, MinimumLength = 5, ErrorMessage = "Vui lòng chọn điểm làm việc trên bản đồ.")]

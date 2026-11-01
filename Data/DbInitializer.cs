@@ -38,6 +38,7 @@ public static class DbInitializer
 
         await SeedAdminAsync(db, config, logger);
         await NormalizeUploadUrlsAsync(db, logger);
+        await SyncWorkingAreasAsync(db, logger);
         if (config.GetValue("Seed:SampleData", true)) await SeedSampleServicesAsync(db);
     }
 
@@ -78,6 +79,25 @@ public static class DbInitializer
         {
             await db.SaveChangesAsync();
             logger.LogInformation("Đã chuẩn hóa {Count} đường dẫn ảnh sang dạng /uploads/…", changed);
+        }
+    }
+
+    /// <summary>
+    /// SRS 7.9: khu vực của Tasker lấy theo địa chỉ điểm làm việc. Hồ sơ gửi trước khi có quy tắc này (khu vực chọn tay
+    /// từ danh sách cố định) được cập nhật lại một lần cho khớp địa chỉ; hồ sơ có địa chỉ không suy ra được thì giữ nguyên.
+    /// </summary>
+    private static async Task SyncWorkingAreasAsync(AppDbContext db, ILogger logger)
+    {
+        var changed = 0;
+        foreach (var p in await db.TaskerProfiles.Where(x => x.BaseAddress != null && x.BaseAddress != "").ToListAsync())
+        {
+            var area = WorkingAreas.FromAddress(p.BaseAddress);
+            if (area is not null && area != p.WorkingArea) { p.WorkingArea = area; changed++; }
+        }
+        if (changed > 0)
+        {
+            await db.SaveChangesAsync();
+            logger.LogInformation("Đã cập nhật khu vực của {Count} hồ sơ Tasker theo địa chỉ điểm làm việc", changed);
         }
     }
 
