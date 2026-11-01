@@ -14,6 +14,12 @@ public class User
     public string? AvatarUrl { get; set; }
     public UserRole Role { get; set; } = UserRole.Customer;
     public bool IsActive { get; set; } = true; // US30: khóa/mở khóa tài khoản
+
+    /// <summary>
+    /// Email đã xác thực bằng OTP. Tài khoản tự đăng ký phải nhập mã OTP mới đăng nhập được;
+    /// tài khoản cũ / Admin tạo sẵn mặc định đã xác thực.
+    /// </summary>
+    public bool EmailVerified { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // US12/US36 – điều kiện thanh toán tiền mặt (BR-P06, BR-U01)

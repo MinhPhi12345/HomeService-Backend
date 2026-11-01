@@ -19,4 +19,9 @@ public class MatchingOptions
     public int MaxRounds { get; set; } = 5;
     /// <summary>BR-B02: một Tasker không nhận 2 đơn có giờ hẹn cách nhau dưới số giờ này.</summary>
     public double ScheduleGapHours { get; set; } = 2;
+    /// <summary>
+    /// BR-P04 (bổ sung): ký quỹ – Tasker phải có số dư KHẢ DỤNG tối thiểu bằng mức này mới được bật nhận đơn,
+    /// nhận lời mời và nhận đơn (mọi phương thức). Đơn tiền mặt còn phải đủ tiền chiết khấu.
+    /// </summary>
+    public decimal MinWalletDeposit { get; set; } = 100_000m;
 }

@@ -17,4 +17,6 @@ public class ApiException : Exception
     public static ApiException Conflict(string message) => new(StatusCodes.Status409Conflict, message);
     public static ApiException Forbidden() => new(StatusCodes.Status403Forbidden, string.Empty);
     public static ApiException NotFound() => new(StatusCodes.Status404NotFound, string.Empty);
+    public static ApiException TooManyRequests(string message) => new(StatusCodes.Status429TooManyRequests, message);
+    public static ApiException ServiceUnavailable(string message) => new(StatusCodes.Status503ServiceUnavailable, message);
 }

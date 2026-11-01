@@ -11,7 +11,15 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
+// Log tiếng Việt có dấu không bị lỗi font khi ghi ra file stdout (IIS / Plesk)
+Console.OutputEncoding = Encoding.UTF8;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Bí mật của bản deploy (chuỗi kết nối, JWT key, mật khẩu Admin) – file chỉ nằm trên máy chủ, KHÔNG commit (.gitignore).
+// Mẫu: appsettings.Secrets.example.json. Biến môi trường vẫn được ưu tiên hơn file này.
+builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: false);
+builder.Configuration.AddEnvironmentVariables();
 
 // Thư mục lưu ảnh tải lên (POST /api/uploads) – cấu hình Storage:UploadsPath, tạo trước để phục vụ /uploads/...
 var uploadsPath = StorageOptions.ResolveUploadsPath(builder.Configuration, builder.Environment.ContentRootPath);
@@ -46,6 +54,9 @@ builder.Services.AddScoped<BookingJobs>();
 builder.Services.AddScoped<CancellationService>();
 builder.Services.AddScoped<TaskerDisciplineService>();
 builder.Services.AddScoped<DisputeService>();
+// Mã OTP qua email (Gmail SMTP – cấu hình "Email" trong appsettings.Secrets.json)
+builder.Services.AddScoped<OtpService>();
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 // Bản đồ & tra địa chỉ OpenStreetMap đi qua Backend (cache + User-Agent riêng)
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient(GeoService.HttpClientName, (sp, client) =>
@@ -63,6 +74,8 @@ builder.Services.Configure<MatchingOptions>(builder.Configuration.GetSection(Mat
 builder.Services.Configure<SettlementOptions>(builder.Configuration.GetSection(SettlementOptions.Section));
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.Section));
 builder.Services.Configure<MapProxyOptions>(builder.Configuration.GetSection(MapProxyOptions.Section));
+builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.Section));
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.Section));
 
 // --- Tác vụ nền: ghép nối theo đợt, hết hạn thanh toán, tự xác nhận... ---
 builder.Services.AddHostedService<BookingWorker>();
@@ -167,6 +180,7 @@ app.UseCors("Default");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })); // Azure Health check / kiểm tra nhanh khi deploy
+// Kiểm tra Backend còn sống – nhận cả GET và HEAD (UptimeRobot mặc định gửi HEAD)
+app.MapMethods("/healthz", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "ok" }));
 
 app.Run();

@@ -22,7 +22,28 @@ public record ReviewResponse(
     bool IsFlagged,
     DateTime CreatedAt,
     // Bổ sung
-    string RevieweeName
+    string RevieweeName,
+    // US27 – thông tin báo cáo / kiểm duyệt: chỉ trả cho người trong đơn và Admin (null với người khác)
+    string? ReportReason = null,
+    string? ReportedByName = null,
+    DateTime? ReportedAt = null,
+    string? ModerationNote = null,
+    DateTime? ModeratedAt = null
+);
+
+// US27 – body của POST /api/reviews/{id}/report: người báo cáo phải nêu lý do (để Admin có căn cứ phân xử)
+public record ReportReviewRequest(
+    [Required(ErrorMessage = "Vui lòng nêu lý do báo cáo.")]
+    [MinLength(10, ErrorMessage = "Lý do báo cáo cần ít nhất 10 ký tự.")]
+    [MaxLength(500, ErrorMessage = "Lý do báo cáo tối đa 500 ký tự.")] string? Reason
+);
+
+// US27 – body của PUT /api/reviews/{id}/moderation: Admin giữ lại hoặc gỡ đánh giá, bắt buộc ghi lý do
+public record ModerateReviewRequest(
+    [Required(ErrorMessage = "Vui lòng chọn giữ lại hay gỡ đánh giá.")] bool? Remove,
+    [Required(ErrorMessage = "Vui lòng nhập lý do quyết định.")]
+    [MinLength(10, ErrorMessage = "Lý do quyết định cần ít nhất 10 ký tự.")]
+    [MaxLength(500, ErrorMessage = "Lý do quyết định tối đa 500 ký tự.")] string? Note
 );
 
 // US26 – GET /api/reviews/user/{userId}

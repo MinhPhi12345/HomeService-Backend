@@ -32,3 +32,14 @@ public record ProfileResponse(
     bool IsCashBlocked,
     DateTime CreatedAt
 );
+
+/// <summary>Đổi mật khẩu khi đã đăng nhập: cần mật khẩu hiện tại + mã OTP gửi về email.</summary>
+public record ChangePasswordRequest(
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu hiện tại.")] string CurrentPassword,
+    [Required(ErrorMessage = "Vui lòng nhập mã OTP.")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP gồm 6 chữ số.")]
+    string Code,
+    [Required(ErrorMessage = "Mật khẩu phải từ 8 ký tự, gồm chữ và số.")]
+    [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).{8,50}$", ErrorMessage = "Mật khẩu phải từ 8 ký tự, gồm chữ và số.")]
+    string NewPassword
+);

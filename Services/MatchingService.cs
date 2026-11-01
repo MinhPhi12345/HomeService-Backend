@@ -249,6 +249,8 @@ public class MatchingService
             if (busy.Contains(t.UserId)) continue;
 
             // BR-P04: đơn tiền mặt chỉ mời Tasker đủ số dư ví để trừ chiết khấu
+            // Ký quỹ: Tasker chưa nạp đủ mức tối thiểu thì không nhận được lời mời (mọi phương thức thanh toán)
+            if (t.WalletBalance - t.ReservedAmount < _opt.MinWalletDeposit) continue;
             if (booking.PaymentMethod == PaymentMethod.Cash && t.WalletBalance - t.ReservedAmount < commissionEstimate) continue;
 
             var maxRadius = _opt.Radii.Max();

@@ -52,6 +52,11 @@ public class OfferService
             && b.ScheduledTime > gapFrom && b.ScheduledTime < gapTo);
         if (conflict) throw ApiException.Conflict("Bạn đã có đơn khác trùng lịch (cách nhau dưới 2 giờ).");
 
+        // Ký quỹ: mọi đơn đều cần số dư khả dụng tối thiểu
+        if (profile.AvailableBalance < _matching.MinWalletDeposit)
+            throw ApiException.BadRequest(
+                $"Ví cần tối thiểu {MoneyFormat.Vnd(_matching.MinWalletDeposit)} khả dụng (ký quỹ) để nhận đơn. Vui lòng nạp thêm.");
+
         // BR-P04/BR-P05: đơn tiền mặt cần đủ số dư khả dụng để tạm giữ chiết khấu
         var commission = Money.Commission(booking.TotalPrice, booking.CommissionRate);
         if (booking.PaymentMethod == PaymentMethod.Cash && profile.AvailableBalance < commission)

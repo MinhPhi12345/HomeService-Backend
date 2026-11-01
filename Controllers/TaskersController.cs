@@ -127,11 +127,18 @@ public class TaskersController : ControllerBase
     // US16 - Tasker bật/tắt nhận đơn; app gửi vị trí hiện tại 1 lần khi bật (không theo dõi GPS chạy ngầm – BR-M06)
     [HttpPut("availability")]
     [Authorize(Roles = Roles.Tasker)]
-    public async Task<IActionResult> UpdateAvailability(UpdateAvailabilityRequest request)
+    public async Task<IActionResult> UpdateAvailability(UpdateAvailabilityRequest request,
+        [FromServices] Microsoft.Extensions.Options.IOptions<HomeService.Api.Options.MatchingOptions> matching)
     {
         var userId = User.GetUserId();
         var profile = await _db.TaskerProfiles.FirstOrDefaultAsync(t => t.UserId == userId);
         if (profile is null) return NotFound();
+
+        // Ký quỹ: chỉ bật nhận đơn khi số dư khả dụng đạt mức tối thiểu
+        var minDeposit = matching.Value.MinWalletDeposit;
+        if (request.IsAvailable == true && !profile.IsAvailable && profile.AvailableBalance < minDeposit)
+            throw ApiException.BadRequest(
+                $"Cần ký quỹ tối thiểu {MoneyFormat.Vnd(minDeposit)} trong ví để bật nhận đơn. Số dư khả dụng hiện là {MoneyFormat.Vnd(profile.AvailableBalance)}.");
 
         profile.IsAvailable = request.IsAvailable!.Value;
         if (request.Latitude is not null && request.Longitude is not null)
