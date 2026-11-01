@@ -67,7 +67,7 @@ HomeService-Backend/
 ├── Data/          # AppDbContext, DbInitializer (migrate + seed)
 ├── Migrations/    # 1 migration / Sprint
 ├── Middleware/    # Lỗi chung → JSON { "message" } (SRS 8.6)
-├── wwwroot/uploads/  # ảnh tải lên qua POST /api/uploads
+├── wwwroot/uploads/  # ảnh tải lên qua POST /api/uploads (trả về "/uploads/…" tương đối)
 └── docs/          # Postman collection, hướng dẫn Jira theo Sprint, đề xuất cập nhật SRS
 ```
 

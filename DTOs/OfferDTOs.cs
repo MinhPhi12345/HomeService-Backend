@@ -20,5 +20,8 @@ public record OfferResponse(
     string? Note,
     int Quantity,
     // US26 – uy tín của khách (điểm trung bình Tasker đánh giá khách; null nếu chưa có)
-    decimal? CustomerRatingAverage
+    decimal? CustomerRatingAverage,
+    // US26 – để Tasker mở chi tiết lời mời và xem nhận xét về khách (GET /api/reviews/user/{customerId})
+    int CustomerId = 0,
+    int CustomerReviewCount = 0
 );

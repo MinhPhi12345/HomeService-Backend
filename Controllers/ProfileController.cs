@@ -1,7 +1,10 @@
+using HomeService.Api.Common;
 using HomeService.Api.Data;
 using HomeService.Api.DTOs;
+using HomeService.Api.Enums;
 using HomeService.Api.Extensions;
 using HomeService.Api.Models;
+using HomeService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -38,9 +41,35 @@ public class ProfileController : ControllerBase
         user.FullName = request.FullName.Trim();
         user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
         user.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
-        user.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+        user.AvatarUrl = UploadUrl.Normalize(request.AvatarUrl);
         await _db.SaveChangesAsync();
         return Ok(ToResponse(user));
+    }
+
+    // Đổi mật khẩu – bước 1: gửi mã OTP về email của tài khoản đang đăng nhập
+    [HttpPost("password/otp")]
+    public async Task<ActionResult<OtpSentResponse>> SendChangePasswordOtp([FromServices] OtpService otp)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == User.GetUserId());
+        if (user is null) return NotFound();
+        return Ok(await otp.SendAsync(user, OtpPurpose.ChangePassword));
+    }
+
+    // Đổi mật khẩu – bước 2: mật khẩu hiện tại + mã OTP + mật khẩu mới
+    [HttpPut("password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, [FromServices] OtpService otp)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == User.GetUserId());
+        if (user is null) return NotFound();
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            throw ApiException.BadRequest("Mật khẩu hiện tại không đúng.");
+        if (request.NewPassword == request.CurrentPassword)
+            throw ApiException.BadRequest("Mật khẩu mới phải khác mật khẩu hiện tại.");
+
+        await otp.VerifyAsync(user.Id, OtpPurpose.ChangePassword, request.Code);
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Đổi mật khẩu thành công." });
     }
 
     private static ProfileResponse ToResponse(User u) => new(

@@ -36,7 +36,7 @@ public class Dispute
     public DateTime? ResolvedAt { get; set; }
 
     public static string JoinUrls(IEnumerable<string>? urls) =>
-        string.Join(',', (urls ?? Array.Empty<string>()).Select(u => u.Trim()).Where(u => u.Length > 0));
+        string.Join(',', (urls ?? Array.Empty<string>()).Select(u => Common.UploadUrl.Normalize(u) ?? string.Empty).Where(u => u.Length > 0));
 
     public static List<string> SplitUrls(string? urls) =>
         string.IsNullOrWhiteSpace(urls) ? new List<string>() : urls.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();

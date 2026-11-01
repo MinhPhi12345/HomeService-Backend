@@ -16,6 +16,8 @@ public class AuditService
     public const string DisputeResolved = "DisputeResolved";
     public const string WalletTopUp = "WalletTopUp";
     public const string WalletWithdraw = "WalletWithdraw";
+    public const string ReviewKept = "ReviewKept";       // US27 – Admin giữ lại đánh giá bị báo cáo
+    public const string ReviewRemoved = "ReviewRemoved"; // US27 – Admin gỡ đánh giá bị báo cáo
 
     private readonly AppDbContext _db;
     private readonly IHttpContextAccessor _http;

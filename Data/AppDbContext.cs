@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Dispute> Disputes => Set<Dispute>();
+    public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -192,9 +193,21 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Review>()
             .Property(r => r.Comment).HasMaxLength(500);
         modelBuilder.Entity<Review>()
+            .Property(r => r.ReportReason).HasMaxLength(500);
+        modelBuilder.Entity<Review>()
+            .Property(r => r.ModerationNote).HasMaxLength(500);
+        modelBuilder.Entity<Review>()
             .HasIndex(r => new { r.BookingId, r.ReviewerId }).IsUnique(); // BR-R01: mỗi người 1 đánh giá / đơn
         modelBuilder.Entity<Review>()
             .ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "[Rating] BETWEEN 1 AND 5"));
+
+        // Mã OTP qua email (đăng ký, quên/đổi mật khẩu, rút tiền)
+        modelBuilder.Entity<OtpCode>(e =>
+        {
+            e.Property(o => o.CodeHash).HasMaxLength(64).IsUnicode(false);
+            e.HasIndex(o => new { o.UserId, o.Purpose, o.CreatedAt });
+            e.HasOne(o => o.User).WithMany().HasForeignKey(o => o.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<Notification>(e =>
         {

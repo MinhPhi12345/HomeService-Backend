@@ -27,3 +27,10 @@ Thumbs.db
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep
 tile-cache/
+
+## Bí mật bản deploy (chỉ đặt trên máy chủ)
+appsettings.Secrets.json
+
+## Kết quả chạy unit test / độ bao phủ
+TestResults/
+coverage-report/

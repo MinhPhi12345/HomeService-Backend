@@ -13,7 +13,7 @@ public class TaskerProfile
     public string IdCardNumber { get; set; } = string.Empty; // CCCD 12 chữ số; rỗng = Tasker chưa gửi hồ sơ
     public string? IdCardImageUrl { get; set; }
     public string? Skills { get; set; } // vd: "Dọn dẹp, Sửa điện nước"
-    public string? WorkingArea { get; set; } // khu vực (SRS 7.9) – hiển thị & gợi ý Tasker
+    public string? WorkingArea { get; set; } // khu vực (SRS 7.9) – nhãn hiển thị, tự lấy từ BaseAddress; không dùng khi ghép nối
 
     public TaskerVerificationStatus VerificationStatus { get; set; } = TaskerVerificationStatus.Pending;
     public decimal RatingAverage { get; set; } = 5.0m;

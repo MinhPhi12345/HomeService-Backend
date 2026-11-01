@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>HomeService.Api</RootNamespace>
     <UserSecretsId>a2f1c6a0-0e3d-4b7d-9d0a-homeservice-api</UserSecretsId>
+    <!-- Hosting dùng chung (Plesk/IIS): chạy Kestrel thành tiến trình riêng – app lỗi không làm dừng cả application pool -->
+    <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +23,21 @@
     </PackageReference>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <!-- Khi publish: không mang theo file bí mật / file mẫu và ảnh test trên máy (ảnh thật nằm sẵn trên máy chủ) -->
+  <ItemGroup>
+    <Content Update="appsettings.Secrets.json;appsettings.Secrets.example.json" CopyToPublishDirectory="Never" />
+    <Content Remove="wwwroot\uploads\**" />
+    <None Remove="wwwroot\uploads\**" />
+  </ItemGroup>
+
+  <!-- Project unit test nằm trong tests/ có csproj riêng: không biên dịch / đóng gói chung với API -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <Content Remove="tests\**" />
+    <None Remove="tests\**" />
+    <EmbeddedResource Remove="tests\**" />
   </ItemGroup>
 
 </Project>

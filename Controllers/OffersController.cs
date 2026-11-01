@@ -48,14 +48,17 @@ public class OffersController : ControllerBase
 
         var customerIds = offers.Select(o => o.CustomerId).Distinct().ToList();
         var ratings = await _db.Reviews
-            .Where(r => customerIds.Contains(r.RevieweeId) && !r.IsFlagged)
+            .Where(r => customerIds.Contains(r.RevieweeId) && !r.IsFlagged && r.RemovedAt == null)
             .GroupBy(r => r.RevieweeId)
-            .Select(g => new { CustomerId = g.Key, Avg = g.Average(r => (double)r.Rating) })
-            .ToDictionaryAsync(x => x.CustomerId, x => (decimal?)Math.Round((decimal)x.Avg, 2));
+            .Select(g => new { CustomerId = g.Key, Avg = g.Average(r => (double)r.Rating), Count = g.Count() })
+            .ToDictionaryAsync(x => x.CustomerId);
 
         return Ok(offers.Select(o => new OfferResponse(
             o.Id, o.BookingId, o.ServiceName, o.Address, o.ScheduledTime, o.DistanceKm, o.TotalPrice,
             o.PaymentMethod, Math.Round(o.TotalPrice * o.CommissionRate, 0, MidpointRounding.AwayFromZero),
-            o.ExpiresAt, o.Status, o.Wave, o.Note, o.Quantity, ratings.GetValueOrDefault(o.CustomerId))));
+            o.ExpiresAt, o.Status, o.Wave, o.Note, o.Quantity,
+            ratings.TryGetValue(o.CustomerId, out var rt) ? Math.Round((decimal)rt.Avg, 2) : null,
+            o.CustomerId,
+            rt?.Count ?? 0)));
     }
 }
