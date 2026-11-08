@@ -31,7 +31,7 @@ internal static class JwtTestConfig
 /// <summary>US01 – Đăng ký + xác thực email OTP, US02 – Đăng nhập, quên mật khẩu (AuthService).</summary>
 public class AuthServiceTests : TestBase
 {
-    private AuthService CreateService() => new(Db, new TokenService(JwtTestConfig.Create()), CreateOtp());
+    private AuthService CreateService() => new(Db, new TokenService(JwtTestConfig.Create()), CreateOtp(), CreateVouchers());
 
     private static RegisterRequest Register(string email = "Khach@Test.vn", UserRole role = UserRole.Customer, string? phone = " 0901234567 ",
         string name = "  Nguyễn Văn A  ")

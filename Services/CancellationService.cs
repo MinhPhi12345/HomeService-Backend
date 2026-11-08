@@ -25,10 +25,12 @@ public class CancellationService
     private readonly INotificationService _notifications;
     private readonly AuditService _audit;
     private readonly SettlementOptions _opt;
+    private readonly VoucherService _vouchers;
 
     public CancellationService(AppDbContext db, SettlementService settlement, WalletService wallet,
-        INotificationService notifications, AuditService audit, IOptions<SettlementOptions> options)
+        INotificationService notifications, AuditService audit, IOptions<SettlementOptions> options, VoucherService vouchers)
     {
+        _vouchers = vouchers;
         _db = db;
         _settlement = settlement;
         _wallet = wallet;
@@ -50,11 +52,12 @@ public class CancellationService
             return (0m, "Tasker không đến đúng hẹn – hủy miễn phí, hoàn 100%.");
 
         var now = DateTime.UtcNow;
+        // Phí hủy tính trên số tiền khách thực trả (giá gốc − mã giảm giá, BR-V04)
         if (await HasTaskerArrivedAsync(booking, now))
-            return (Money.Round(booking.TotalPrice * _opt.ArrivedCancelFeePercent / 100m),
+            return (Money.Round(booking.PayableAmount * _opt.ArrivedCancelFeePercent / 100m),
                 $"Tasker đã đến nơi – phí hủy {_opt.ArrivedCancelFeePercent:0}%.");
         if (booking.ScheduledTime - now < TimeSpan.FromHours(_opt.LateCancelHours))
-            return (Money.Round(booking.TotalPrice * _opt.LateCancelFeePercent / 100m),
+            return (Money.Round(booking.PayableAmount * _opt.LateCancelFeePercent / 100m),
                 $"Hủy khi còn dưới {_opt.LateCancelHours:0} giờ đến giờ hẹn – phí {_opt.LateCancelFeePercent:0}%.");
         return (0m, $"Hủy trước giờ hẹn từ {_opt.LateCancelHours:0} giờ trở lên – miễn phí.");
     }
@@ -108,6 +111,10 @@ public class CancellationService
             _notifications.Add(booking.CustomerId, "Phát sinh phí hủy",
                 $"Đơn #{booking.Id}: phí hủy {MoneyFormat.Vnd(fee)} đã được ghi vào khoản cần thanh toán của bạn. {feeReason}");
         }
+
+        // BR-V04: hủy miễn phí → trả lại lượt dùng mã; hủy có phí → mã coi như đã dùng
+        if (fee == 0) await _vouchers.ReleaseAsync(booking.Id);
+        else await _vouchers.MarkUsedAsync(booking.Id);
 
         if (taskerId is not null)
             _notifications.Add(taskerId.Value, "Đơn đã bị hủy",

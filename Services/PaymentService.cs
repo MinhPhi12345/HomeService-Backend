@@ -15,9 +15,12 @@ public class PaymentService
     private readonly INotificationService _notifications;
     private readonly AuditService _audit;
     private readonly WalletService _wallet;
+    private readonly VoucherService _vouchers;
 
-    public PaymentService(AppDbContext db, INotificationService notifications, AuditService audit, WalletService wallet)
+    public PaymentService(AppDbContext db, INotificationService notifications, AuditService audit, WalletService wallet,
+        VoucherService vouchers)
     {
+        _vouchers = vouchers;
         _wallet = wallet;
         _db = db;
         _notifications = notifications;
@@ -70,7 +73,7 @@ public class PaymentService
         var payment = new Payment
         {
             BookingId = booking.Id,
-            Amount = booking.TotalPrice,
+            Amount = booking.PayableAmount, // giá gốc − mã giảm giá (FR-32)
             Method = method,
             Status = PaymentStatus.Held, // tiền được hệ thống tạm giữ
             PaidAt = now,
@@ -80,7 +83,8 @@ public class PaymentService
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync();
         _audit.Add(AuditService.PaymentHeld, payment.Amount, booking.Id, payment.Id,
-            $"Khách trả trước {payment.Amount} qua {method} ({payment.GatewayTransactionId}) – hệ thống tạm giữ");
+            $"Khách trả trước {payment.Amount} qua {method} ({payment.GatewayTransactionId}) – hệ thống tạm giữ"
+            + (booking.DiscountAmount > 0 ? $"; giá gốc {booking.TotalPrice}, mã {booking.VoucherCode} giảm {booking.DiscountAmount}" : string.Empty));
         _notifications.Add(customerId, "Thanh toán thành công",
             $"Đã thanh toán {MoneyFormat.Vnd(payment.Amount)} cho đơn {booking.ServiceCategory!.Name}. " +
             "Hệ thống đang tạm giữ tiền và tìm Tasker cho bạn.");
@@ -136,6 +140,7 @@ public class PaymentService
         {
             booking.Status = BookingStatus.Paid;
             booking.UpdatedAt = now;
+            await _vouchers.OnBookingPaidAsync(booking);
         }
         _notifications.Add(booking.CustomerId, "Đã thanh toán khoản nợ",
             $"Bạn đã thanh toán {MoneyFormat.Vnd(amount)} cho đơn #{booking.Id}.");

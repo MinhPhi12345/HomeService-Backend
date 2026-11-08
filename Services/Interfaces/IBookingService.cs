@@ -18,6 +18,7 @@ public interface IBookingService
     Task ConfirmAsync(int bookingId, int customerId);
 
     /// <summary>US33 – thử lại ghép nối (có thể đổi giờ) khi chưa có Tasker nhận.</summary>
+    Task SearchNowAsync(int bookingId, int customerId);
     Task RetryAsync(int bookingId, int customerId, RetryBookingRequest? request);
 
     /// <summary>US36 – Tasker báo khách chưa thanh toán tiền mặt.</summary>

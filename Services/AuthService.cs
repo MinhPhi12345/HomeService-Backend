@@ -29,8 +29,11 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly OtpService _otp;
 
-    public AuthService(AppDbContext db, ITokenService tokenService, OtpService otp)
+    private readonly VoucherService _vouchers;
+
+    public AuthService(AppDbContext db, ITokenService tokenService, OtpService otp, VoucherService vouchers)
     {
+        _vouchers = vouchers;
         _db = db;
         _tokenService = tokenService;
         _otp = otp;
@@ -112,6 +115,7 @@ public class AuthService : IAuthService
 
         await _otp.VerifyAsync(user.Id, OtpPurpose.VerifyEmail, request.Code);
         user.EmailVerified = true;
+        await _vouchers.GrantWelcomeAsync(user); // FR-33: quà chào mừng cho khách hàng mới
         await _db.SaveChangesAsync();
 
         var (token, expiresAt) = _tokenService.GenerateAccessToken(user);

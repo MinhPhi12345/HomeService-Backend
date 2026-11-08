@@ -3,6 +3,7 @@ using HomeService.Api.Data;
 using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
 using HomeService.Api.Extensions;
+using HomeService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -53,9 +54,13 @@ public class OffersController : ControllerBase
             .Select(g => new { CustomerId = g.Key, Avg = g.Average(r => (double)r.Rating), Count = g.Count() })
             .ToDictionaryAsync(x => x.CustomerId);
 
+        // FR-31: Tasker đang có chiết khấu ưu đãi thì ước tính theo mức đó (mức được chốt khi nhận đơn – BR-T04)
+        var preferential = await TaskerAwardService.ActivePreferentialAsync(_db, userId, now);
+        decimal RateOf(decimal bookingRate) => preferential is { } p && p.Rate < bookingRate ? p.Rate : bookingRate;
+
         return Ok(offers.Select(o => new OfferResponse(
             o.Id, o.BookingId, o.ServiceName, o.Address, o.ScheduledTime, o.DistanceKm, o.TotalPrice,
-            o.PaymentMethod, Math.Round(o.TotalPrice * o.CommissionRate, 0, MidpointRounding.AwayFromZero),
+            o.PaymentMethod, Math.Round(o.TotalPrice * RateOf(o.CommissionRate), 0, MidpointRounding.AwayFromZero),
             o.ExpiresAt, o.Status, o.Wave, o.Note, o.Quantity,
             ratings.TryGetValue(o.CustomerId, out var rt) ? Math.Round((decimal)rt.Avg, 2) : null,
             o.CustomerId,

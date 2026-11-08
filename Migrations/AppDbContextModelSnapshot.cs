@@ -120,6 +120,10 @@ namespace HomeService.Api.Migrations
                     b.Property<bool>("CustomerPresent")
                         .HasColumnType("bit");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<bool>("IsAutoConfirmed")
                         .HasColumnType("bit");
 
@@ -131,6 +135,9 @@ namespace HomeService.Api.Migrations
 
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
+
+                    b.Property<DateTime?>("ManualSearchAvailableAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("MatchRound")
                         .HasColumnType("int");
@@ -160,8 +167,14 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime>("ScheduledTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("SearchExhaustedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("ServiceCategoryId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Status")
                         .IsConcurrencyToken()
@@ -177,11 +190,21 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("VoucherCode")
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<int?>("VoucherId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("ServiceCategoryId");
+
+                    b.HasIndex("VoucherId");
 
                     b.HasIndex("Status", "NextMatchAt");
 
@@ -324,6 +347,55 @@ namespace HomeService.Api.Migrations
                     b.ToTable("Disputes");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.GiftRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("EveryBookings")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MaxDiscount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MinOrderValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ValidDays")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind")
+                        .IsUnique();
+
+                    b.ToTable("GiftRules");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -433,6 +505,10 @@ namespace HomeService.Api.Migrations
 
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal>("PromoSubsidy")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("RefundedAmount")
                         .HasPrecision(18, 2)
@@ -567,6 +643,114 @@ namespace HomeService.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ServiceCategories");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.TaskerMonthlyAward", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AcceptanceRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedById")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("BonusAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("BonusPaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CompletedBookings")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DisputeCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExcludeReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("GiftDeliveredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GiftDescription")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("GiftEmailSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GiftInvitation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("HasGift")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("OnTimeRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTime?>("PreferentialFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("PreferentialRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTime?>("PreferentialTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RatingAverage")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("decimal(3,2)");
+
+                    b.Property<int>("ReviewCount")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RewardCustomized")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("Score")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("decimal(7,4)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TaskerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskerId", "Status");
+
+                    b.HasIndex("Year", "Month", "TaskerId")
+                        .IsUnique();
+
+                    b.ToTable("TaskerMonthlyAwards");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.TaskerProfile", b =>
@@ -727,6 +911,144 @@ namespace HomeService.Api.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.Voucher", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssignedCustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Audience")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("EndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaxDiscount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MinOrderValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("PerCustomerLimit")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceCategoryIds")
+                        .HasMaxLength(200)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SourceBookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("TotalLimit")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("AssignedCustomerId", "Source");
+
+                    b.ToTable("Vouchers");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.VoucherRedemption", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("VoucherId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.HasIndex("VoucherId", "CustomerId", "Status");
+
+                    b.ToTable("VoucherRedemptions");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.WalletTransaction", b =>
                 {
                     b.Property<int>("Id")
@@ -787,11 +1109,18 @@ namespace HomeService.Api.Migrations
                         .HasForeignKey("TaskerId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("HomeService.Api.Models.Voucher", "Voucher")
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Customer");
 
                     b.Navigation("ServiceCategory");
 
                     b.Navigation("Tasker");
+
+                    b.Navigation("Voucher");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.BookingOffer", b =>
@@ -907,6 +1236,17 @@ namespace HomeService.Api.Migrations
                     b.Navigation("Reviewer");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.TaskerMonthlyAward", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.User", "Tasker")
+                        .WithMany()
+                        .HasForeignKey("TaskerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Tasker");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.TaskerProfile", b =>
                 {
                     b.HasOne("HomeService.Api.Models.User", "User")
@@ -916,6 +1256,35 @@ namespace HomeService.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.Voucher", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.User", "AssignedCustomer")
+                        .WithMany()
+                        .HasForeignKey("AssignedCustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AssignedCustomer");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.VoucherRedemption", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeService.Api.Models.Voucher", "Voucher")
+                        .WithMany("Redemptions")
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Voucher");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.WalletTransaction", b =>
@@ -950,6 +1319,11 @@ namespace HomeService.Api.Migrations
             modelBuilder.Entity("HomeService.Api.Models.User", b =>
                 {
                     b.Navigation("TaskerProfile");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.Voucher", b =>
+                {
+                    b.Navigation("Redemptions");
                 });
 #pragma warning restore 612, 618
         }

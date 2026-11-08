@@ -21,13 +21,15 @@ public class BookingService : IBookingService
     private readonly WalletService _wallet;
     private readonly MatchingOptions _matching;
     private readonly AuditService _audit;
+    private readonly VoucherService _vouchers;
 
     public BookingService(AppDbContext db, INotificationService notifications,
         IOptions<BusinessOptions> business, IOptions<SettlementOptions> settlement,
         SettlementService settlementService, WalletService wallet, IOptions<MatchingOptions> matching,
-        AuditService audit)
+        AuditService audit, VoucherService vouchers)
     {
         _audit = audit;
+        _vouchers = vouchers;
         _matching = matching.Value;
         _db = db;
         _notifications = notifications;
@@ -78,6 +80,11 @@ public class BookingService : IBookingService
                 throw ApiException.BadRequest("Đơn này chỉ hỗ trợ thanh toán online.");
         }
 
+        // FR-32: kiểm tra mã giảm giá trước khi tạo đơn (chỉ đơn trả trước – BR-V01)
+        (Voucher Voucher, decimal Discount)? voucher = null;
+        if (!string.IsNullOrWhiteSpace(request.VoucherCode))
+            voucher = await _vouchers.ValidateAsync(customerId, request.VoucherCode, service.Id, totalPrice, method);
+
         var booking = new Booking
         {
             CustomerId = customerId,
@@ -93,7 +100,7 @@ public class BookingService : IBookingService
             Quantity = quantity,
             TotalPrice = totalPrice,
             PaymentMethod = method,
-            CommissionRate = _business.CommissionRate, // BR-P01: chốt tỷ lệ vào đơn
+            CommissionRate = _business.CommissionRate, // BR-P01: tỷ lệ chung; chốt lại theo Tasker lúc nhận đơn (FR-31)
             CustomerPresent = customerPresent,
             CreatedAt = now,
         };
@@ -108,11 +115,19 @@ public class BookingService : IBookingService
             booking.Status = BookingStatus.AwaitingPayment;
             booking.PaymentDueAt = now.AddMinutes(_settlement.PaymentTimeoutMinutes);
             _notifications.Add(customerId, "Vui lòng thanh toán đơn hàng",
-                $"Đơn {service.Name} đã được tạo. Vui lòng thanh toán trong {_settlement.PaymentTimeoutMinutes} phút để hệ thống tìm Tasker.");
+                $"Đơn {service.Name} đã được tạo. Vui lòng thanh toán {MoneyFormat.Vnd(totalPrice - (voucher?.Discount ?? 0))} " +
+                $"trong {_settlement.PaymentTimeoutMinutes} phút để hệ thống tìm Tasker.");
         }
 
+        await using var tx = await _db.Database.BeginTransactionAsync();
         _db.Bookings.Add(booking);
         await _db.SaveChangesAsync();
+        if (voucher is not null)
+        {
+            await _vouchers.ApplyAsync(booking, voucher.Value.Voucher, voucher.Value.Discount);
+            await _db.SaveChangesAsync();
+        }
+        await tx.CommitAsync();
         return booking;
     }
 
@@ -145,6 +160,7 @@ public class BookingService : IBookingService
             if (photo is null) throw ApiException.BadRequest("Vui lòng chụp ảnh hiện trạng.");
             booking.Status = BookingStatus.InProgress;
             booking.CheckInPhotoUrl = photo;
+            booking.StartedAt = now;
             booking.UpdatedAt = now;
             _notifications.Add(booking.CustomerId, "Tasker đã bắt đầu làm việc",
                 $"Đơn {booking.ServiceCategory!.Name} đang được thực hiện.");
@@ -215,6 +231,36 @@ public class BookingService : IBookingService
         await tx.CommitAsync();
     }
 
+    // US33 / BR-M07 – khách bấm "Tìm lại ngay" khi đơn đã quét hết mà chưa ai nhận và đang chờ lượt quét lại.
+    // Quét lại ngay từ đợt 3 km trong CÙNG vòng: chỉ mời Tasker chưa được mời (Tasker đã từ chối không bị làm phiền lại).
+    public async Task SearchNowAsync(int bookingId, int customerId)
+    {
+        var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId)
+                      ?? throw ApiException.NotFound();
+        if (booking.CustomerId != customerId) throw ApiException.Forbidden();
+        var now = DateTime.UtcNow;
+        if (booking.Status == BookingStatus.Matched)
+            throw ApiException.BadRequest("Hệ thống đang gửi lời mời cho Tasker gần bạn, vui lòng chờ kết quả.");
+        if (booking.Status != BookingStatus.Pending || booking.TaskerId != null || booking.SearchExhaustedAt is null)
+            throw ApiException.BadRequest("Đơn không ở trạng thái chờ tìm lại Tasker.");
+        if (now >= booking.ScheduledTime.AddMinutes(-_matching.StopSearchMinutesBefore))
+            throw ApiException.BadRequest("Đã gần giờ hẹn nên hệ thống đã dừng tìm Tasker cho đơn này.");
+        if (booking.ManualSearchAvailableAt is not null && booking.ManualSearchAvailableAt > now)
+        {
+            var wait = (int)Math.Ceiling((booking.ManualSearchAvailableAt.Value - now).TotalMinutes);
+            throw ApiException.BadRequest($"Bạn vừa tìm lại. Vui lòng thử lại sau {Math.Max(1, wait)} phút.");
+        }
+
+        var rows = await _db.Bookings
+            .Where(b => b.Id == bookingId && b.Status == BookingStatus.Pending && b.TaskerId == null)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.CurrentWave, 0)
+                .SetProperty(b => b.NextMatchAt, now)
+                .SetProperty(b => b.ManualSearchAvailableAt, now.AddMinutes(_matching.ManualSearchCooldownMinutes))
+                .SetProperty(b => b.UpdatedAt, now));
+        if (rows == 0) throw ApiException.BadRequest("Đơn không ở trạng thái chờ tìm lại Tasker.");
+    }
+
     // US33 – Khách chọn Thử lại (có thể đổi giờ) khi đơn "Chưa có Tasker nhận" (FR-24)
     public async Task RetryAsync(int bookingId, int customerId, RetryBookingRequest? request)
     {
@@ -248,6 +294,8 @@ public class BookingService : IBookingService
         booking.MatchRound += 1;
         booking.CurrentWave = 0;
         booking.NextMatchAt = null;
+        booking.SearchExhaustedAt = null;
+        booking.ManualSearchAvailableAt = null;
         booking.Status = BookingStatus.Pending;
         booking.UpdatedAt = DateTime.UtcNow;
         if (oldTasker is not null)

@@ -16,5 +16,6 @@ public record PublicProfileResponse(
     bool? IsVerified,            // chỉ Tasker
     string? WorkingArea,         // chỉ Tasker
     string? Skills,              // chỉ Tasker
-    IReadOnlyList<ReviewResponse> Reviews
+    IReadOnlyList<ReviewResponse> Reviews,
+    IReadOnlyList<AwardBadgeResponse>? Badges = null // FR-31 – huy hiệu Tasker xuất sắc tháng (chỉ Tasker)
 );

@@ -23,11 +23,14 @@ public class BookingJobs
     private readonly TaskerDisciplineService _discipline;
     private readonly WalletService _wallet;
     private readonly NotificationOptions _notificationOptions;
+    private readonly VoucherService _vouchers;
 
     public BookingJobs(AppDbContext db, INotificationService notifications, SettlementService settlement,
         IOptions<SettlementOptions> options, ILogger<BookingJobs> logger, CancellationService cancellation,
-        TaskerDisciplineService discipline, WalletService wallet, IOptions<NotificationOptions> notificationOptions)
+        TaskerDisciplineService discipline, WalletService wallet, IOptions<NotificationOptions> notificationOptions,
+        VoucherService vouchers)
     {
+        _vouchers = vouchers;
         _notificationOptions = notificationOptions.Value;
         _discipline = discipline;
         _wallet = wallet;
@@ -56,8 +59,10 @@ public class BookingJobs
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, BookingStatus.Cancelled)
                                           .SetProperty(x => x.UpdatedAt, now), ct);
             if (rows == 0) continue;
+            var released = await _vouchers.ReleaseAsync(b.Id); // BR-V04: trả lại lượt dùng mã
             _notifications.Add(b.CustomerId, "Đơn đã bị hủy",
-                $"Đơn #{b.Id} đã tự hủy do quá hạn thanh toán {_opt.PaymentTimeoutMinutes} phút.");
+                $"Đơn #{b.Id} đã tự hủy do quá hạn thanh toán {_opt.PaymentTimeoutMinutes} phút."
+                + (released ? " Mã giảm giá đã được trả lại để bạn dùng cho đơn khác." : string.Empty));
             await _db.SaveChangesAsync(ct);
         }
     }
@@ -142,6 +147,7 @@ public class BookingJobs
                 booking.Status = BookingStatus.Expired;
                 booking.UpdatedAt = now;
                 await _settlement.RefundHeldAsync(booking, 0, "Đơn đã hết hạn vì chưa có Tasker nhận.");
+                await _vouchers.ReleaseAsync(booking.Id);
                 _notifications.Add(booking.CustomerId, "Đơn đã hết hạn",
                     $"Đơn #{booking.Id} đã hết hạn vì chưa có Tasker nhận. Bạn có thể tạo đơn mới.");
                 await _db.SaveChangesAsync(ct);
@@ -186,6 +192,9 @@ public class BookingJobs
                 booking.NoShowAt = now;
                 booking.UpdatedAt = now;
                 await _discipline.AddViolationAsync(taskerId, 1, $"không đến đơn #{booking.Id} đúng hẹn");
+                // FR-33: quà xin lỗi cho khách
+                await _vouchers.GrantApologyAsync(booking.CustomerId, booking.Id,
+                    $"HomeService xin lỗi vì Tasker không đến đơn #{booking.Id} đúng hẹn.");
                 _notifications.Add(booking.CustomerId, "Tasker chưa đến",
                     $"Tasker chưa đến đơn #{booking.Id} sau {_opt.NoShowMinutes} phút. Bạn có thể Tìm Tasker khác hoặc Hủy (hoàn 100%). " +
                     $"Nếu không chọn trong {_opt.NoShowAutoCancelHours} giờ, đơn sẽ tự hủy.");

@@ -39,7 +39,7 @@ public class ReportsController : ControllerBase
             .Where(p => FinishedStatuses.Contains(p.Status))
             .Select(p => new
             {
-                p.Amount, p.RefundedAmount, p.CommissionAmount, p.TaskerAmount, p.Method,
+                p.Amount, p.RefundedAmount, p.CommissionAmount, p.TaskerAmount, p.Method, p.PromoSubsidy,
                 At = p.ReleasedAt ?? p.RefundedAt ?? p.PaidAt,
             })
             .ToListAsync();
@@ -58,6 +58,12 @@ public class ReportsController : ControllerBase
             .Select(g => new RevenuePoint(g.Key, g.Sum(x => x.Amount - x.RefundedAmount), g.Sum(x => x.CommissionAmount), g.Count()))
             .ToList();
 
+        var bonuses = await _db.WalletTransactions.AsNoTracking()
+            .Where(w => w.Type == WalletTransactionType.Bonus && w.CreatedAt >= f && w.CreatedAt <= t)
+            .Select(w => w.Amount).ToListAsync();
+        var promotionCost = inRange.Sum(p => p.PromoSubsidy);
+        var commission = inRange.Sum(p => p.CommissionAmount);
+
         return Ok(new RevenueReport(
             f, t,
             inRange.Sum(p => p.Amount - p.RefundedAmount),
@@ -69,7 +75,10 @@ public class ReportsController : ControllerBase
             refunded.Sum(),
             inRange.Sum(p => p.TaskerAmount),
             group,
-            series));
+            series,
+            promotionCost,
+            bonuses.Sum(),
+            commission - promotionCost - bonuses.Sum()));
     }
 
     // US32 - Số lượng đơn theo trạng thái (status là SỐ) trong khoảng ngày tạo đơn

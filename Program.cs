@@ -56,6 +56,9 @@ builder.Services.AddScoped<TaskerDisciplineService>();
 builder.Services.AddScoped<DisputeService>();
 // Mã OTP qua email (Gmail SMTP – cấu hình "Email" trong appsettings.Secrets.json)
 builder.Services.AddScoped<OtpService>();
+builder.Services.AddScoped<VoucherService>();
+builder.Services.AddScoped<PromotionService>();
+builder.Services.AddScoped<TaskerAwardService>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 // Bản đồ & tra địa chỉ OpenStreetMap đi qua Backend (cache + User-Agent riêng)
 builder.Services.AddMemoryCache();
@@ -76,6 +79,8 @@ builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection
 builder.Services.Configure<MapProxyOptions>(builder.Configuration.GetSection(MapProxyOptions.Section));
 builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.Section));
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.Section));
+builder.Services.Configure<AwardOptions>(builder.Configuration.GetSection(AwardOptions.Section));
+builder.Services.Configure<PromotionOptions>(builder.Configuration.GetSection(PromotionOptions.Section));
 
 // --- Tác vụ nền: ghép nối theo đợt, hết hạn thanh toán, tự xác nhận... ---
 builder.Services.AddHostedService<BookingWorker>();

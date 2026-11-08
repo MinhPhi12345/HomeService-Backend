@@ -142,25 +142,38 @@ public class MatchingService
         }
 
         // Hết các đợt mà không ai nhận
-        var stopRetryAt = booking.ScheduledTime.AddHours(-_opt.StopRetryHoursBefore);
-        if (now < stopRetryAt)
+        // BR-M05: còn trước mốc dừng (giờ hẹn − 45 phút) → giữ "Đang tìm Tasker" và tự quét lại
+        // (giờ hẹn còn xa: 30 phút/lần, còn trong 2 giờ: 5 phút/lần). Lần đầu quét hết thì báo khách.
+        var stopAt = SearchStopsAt(booking.ScheduledTime);
+        if (now < stopAt)
         {
-            // BR-M05: đơn đặt trước giữ status 0 và tự thử lại sau mỗi 30 phút đến T − 2 giờ
-            var nextTry = now.AddMinutes(_opt.AdvanceRetryMinutes);
-            if (nextTry > stopRetryAt) nextTry = stopRetryAt;
-            await _db.Bookings
+            var interval = booking.ScheduledTime - now > TimeSpan.FromHours(_opt.NearWindowHours)
+                ? _opt.AdvanceRetryMinutes
+                : _opt.NearRetryMinutes;
+            var nextTry = now.AddMinutes(Math.Max(1, interval));
+            if (nextTry > stopAt) nextTry = stopAt;
+            var firstTime = booking.SearchExhaustedAt is null;
+            var kept = await _db.Bookings
                 .Where(b => b.Id == bookingId && b.TaskerId == null &&
                             (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Matched))
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(b => b.Status, BookingStatus.Pending)
                     .SetProperty(b => b.CurrentWave, 0)
                     .SetProperty(b => b.NextMatchAt, nextTry)
+                    .SetProperty(b => b.SearchExhaustedAt, b => b.SearchExhaustedAt ?? now)
                     .SetProperty(b => b.UpdatedAt, now), ct);
+            if (kept > 0 && firstTime)
+            {
+                _notifications.Add(booking.CustomerId, "Đang tiếp tục tìm Tasker",
+                    $"Chưa có Tasker nhận đơn #{booking.Id}. Hệ thống vẫn đang tìm và sẽ tự tìm lại lúc {VnTime.Clock(nextTry)}. " +
+                    "Bạn có thể bấm “Tìm lại ngay” hoặc hủy đơn.");
+                await _db.SaveChangesAsync(ct);
+            }
             await tx.CommitAsync(ct);
             return;
         }
 
-        // FR-24: chuyển sang "Chưa có Tasker nhận" và báo khách hàng
+        // FR-24: đã sát giờ hẹn → chuyển sang "Chưa có Tasker nhận" và báo khách hàng
         var rows = await _db.Bookings
             .Where(b => b.Id == bookingId && b.TaskerId == null &&
                         (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Matched))
@@ -171,10 +184,62 @@ public class MatchingService
         if (rows > 0)
         {
             _notifications.Add(booking.CustomerId, "Chưa có Tasker nhận đơn",
-                "Hiện chưa có Tasker nhận đơn của bạn. Bạn có thể thử lại hoặc đổi giờ.");
+                $"Đã gần giờ hẹn mà chưa có Tasker nhận đơn #{booking.Id}. Bạn có thể thử lại với giờ khác hoặc hủy đơn" +
+                (booking.PaymentMethod == PaymentMethod.Cash ? "." : " (được hoàn 100% số tiền đã trả)."));
             await _db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
+    }
+
+    /// <summary>BR-M05: thời điểm dừng tìm Tasker của đơn (giờ hẹn − StopSearchMinutesBefore).</summary>
+    public DateTime SearchStopsAt(DateTime scheduledTime) => scheduledTime.AddMinutes(-_opt.StopSearchMinutesBefore);
+
+    /// <summary>
+    /// BR-M08: Tasker vừa bật nhận đơn (hoặc gửi vị trí mới) → các đơn đang chờ lượt quét lại ở gần
+    /// được đưa lên quét ngay ở lượt kế tiếp của BookingWorker, không phải chờ 30 phút / 5 phút.
+    /// Chỉ đánh thức đơn mà Tasker này chưa được mời trong vòng hiện tại và nằm trong bán kính phục vụ của Tasker.
+    /// Trả về số đơn được đánh thức.
+    /// </summary>
+    public async Task<int> WakeNearbyBookingsAsync(int taskerId, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var t = await _db.TaskerProfiles.AsNoTracking()
+            .Include(p => p.User)
+            .FirstOrDefaultAsync(p => p.UserId == taskerId, ct);
+        if (t is null || !t.IsAvailable || t.VerificationStatus != TaskerVerificationStatus.Approved ||
+            t.User is null || !t.User.IsActive || (t.SuspendedUntil != null && t.SuspendedUntil > now))
+            return 0;
+
+        var useLast = t.LastLocationAt != null && t.LastLocationAt >= now.AddMinutes(-_opt.LocationFreshMinutes)
+                      && t.LastLatitude != null && t.LastLongitude != null;
+        var lat = useLast ? t.LastLatitude!.Value : t.BaseLatitude;
+        var lng = useLast ? t.LastLongitude!.Value : t.BaseLongitude;
+        var reach = Math.Min(_opt.Radii.Max(), t.ServiceRadiusKm);
+        var stopBefore = now.AddMinutes(_opt.StopSearchMinutesBefore); // giờ hẹn phải sau mốc này
+
+        var waiting = await _db.Bookings.AsNoTracking()
+            .Include(b => b.ServiceCategory)
+            .Where(b => b.Status == BookingStatus.Pending && b.TaskerId == null
+                        && b.NextMatchAt != null && b.NextMatchAt > now
+                        && b.ScheduledTime > stopBefore
+                        && b.Latitude != null && b.Longitude != null
+                        && b.CustomerId != taskerId
+                        && !b.Offers.Any(o => o.TaskerId == taskerId && (o.Round == b.MatchRound || o.Status == OfferStatus.Accepted)))
+            .ToListAsync(ct);
+
+        var ids = waiting
+            .Where(b => SkillMatcher.Matches(t.Skills, b.ServiceCategory!.Name)
+                        && GeoHelper.DistanceKm(lat, lng, b.Latitude!.Value, b.Longitude!.Value) <= reach)
+            .Select(b => b.Id)
+            .ToList();
+        if (ids.Count == 0) return 0;
+
+        return await _db.Bookings
+            .Where(b => ids.Contains(b.Id) && b.Status == BookingStatus.Pending && b.TaskerId == null
+                        && b.NextMatchAt != null && b.NextMatchAt > now)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.CurrentWave, 0)
+                .SetProperty(b => b.NextMatchAt, now), ct);
     }
 
     /// <summary>Lọc cứng (BR-M01) rồi chấm điểm (BR-M02) các Tasker trong bán kính của đợt.</summary>

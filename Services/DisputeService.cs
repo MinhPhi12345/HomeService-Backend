@@ -19,11 +19,14 @@ public class DisputeService
     private readonly INotificationService _notifications;
     private readonly AuditService _audit;
     private readonly IBookingService _bookings;
+    private readonly VoucherService _vouchers;
     private readonly SettlementOptions _opt;
 
     public DisputeService(AppDbContext db, SettlementService settlement, TaskerDisciplineService discipline,
-        INotificationService notifications, AuditService audit, IBookingService bookings, IOptions<SettlementOptions> options)
+        INotificationService notifications, AuditService audit, IBookingService bookings, IOptions<SettlementOptions> options,
+        VoucherService vouchers)
     {
+        _vouchers = vouchers;
         _db = db;
         _settlement = settlement;
         _discipline = discipline;
@@ -186,7 +189,12 @@ public class DisputeService
 
         // BR-D02: khiếu nại được chấp nhận (hoàn một phần / toàn bộ / làm lại) → Tasker +1 điểm vi phạm
         if (resolution != DisputeResolution.ReleaseFull)
+        {
             await _discipline.AddViolationAsync(dispute.TaskerId, 1, $"khiếu nại đơn #{booking.Id} được chấp nhận");
+            // FR-33: quà xin lỗi cho khách khi khiếu nại được chấp nhận
+            await _vouchers.GrantApologyAsync(dispute.CustomerId, booking.Id,
+                $"HomeService xin lỗi vì trải nghiệm chưa tốt ở đơn #{booking.Id}.");
+        }
 
         _audit.Add(AuditService.DisputeResolved, refund ?? 0, booking.Id, booking.Payment?.Id,
             $"Khiếu nại #{dispute.Id}: {resolution} – {dispute.AdminNote}");
