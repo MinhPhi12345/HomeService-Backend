@@ -15,7 +15,7 @@ namespace HomeService.Api.Tests.Controllers;
 /// <summary>AuthController – mã HTTP trả về cho FE.</summary>
 public class AuthControllerTests : TestBase
 {
-    private AuthController Create() => new(new AuthService(Db, new TokenService(JwtTestConfig.Create()), CreateOtp()));
+    private AuthController Create() => new(new AuthService(Db, new TokenService(JwtTestConfig.Create()), CreateOtp(), CreateVouchers()));
 
     private static RegisterRequest Register(string email) => new("Nguyễn Văn A", email, "Matkhau123", null, UserRole.Customer);
 
@@ -144,7 +144,7 @@ public class ProfileControllerTests : TestBase
     public async Task DoiMatKhau_MaOtpQuenMatKhauKhongDungChoDoiMatKhau()
     {
         var user = Db.Customer(configure: u => { u.Email = "cheo@test.vn"; u.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Matkhau123"); });
-        await new AuthService(Db, new TokenService(JwtTestConfig.Create()), CreateOtp()).ForgotPasswordAsync("cheo@test.vn");
+        await new AuthService(Db, new TokenService(JwtTestConfig.Create()), CreateOtp(), CreateVouchers()).ForgotPasswordAsync("cheo@test.vn");
 
         var ex = await Assert.ThrowsAsync<ApiException>(() => new ProfileController(Db).AsUser(user.Id, UserRole.Customer)
             .ChangePassword(new ChangePasswordRequest("Matkhau123", Emails.LastCode(), "MatKhauMoi9"), CreateOtp()));

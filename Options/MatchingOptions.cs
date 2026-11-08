@@ -13,8 +13,16 @@ public class MatchingOptions
     public int[] Timeouts => WaveTimeoutSeconds.Length > 0 ? WaveTimeoutSeconds : new[] { 45, 45, 60 };
     public int OffersPerWave { get; set; } = 5;
     public int LocationFreshMinutes { get; set; } = 60;
+    /// <summary>BR-M05: đã quét hết các đợt mà chưa ai nhận → tự quét lại sau số phút này (giờ hẹn còn xa).</summary>
     public int AdvanceRetryMinutes { get; set; } = 30;
-    public double StopRetryHoursBefore { get; set; } = 2;
+    /// <summary>BR-M05: giờ hẹn còn trong NearWindowHours giờ → quét lại dày hơn, sau số phút này.</summary>
+    public int NearRetryMinutes { get; set; } = 5;
+    public double NearWindowHours { get; set; } = 2;
+    public const int DefaultStopSearchMinutes = 45;
+    /// <summary>BR-M05: còn dưới số phút này trước giờ hẹn mà chưa có Tasker → dừng tìm, đơn chuyển "Chưa có Tasker nhận".</summary>
+    public int StopSearchMinutesBefore { get; set; } = DefaultStopSearchMinutes;
+    /// <summary>BR-M07: khoảng cách tối thiểu giữa 2 lần khách bấm "Tìm lại ngay".</summary>
+    public int ManualSearchCooldownMinutes { get; set; } = 5;
     public int TickSeconds { get; set; } = 5;
     public int MaxRounds { get; set; } = 5;
     /// <summary>BR-B02: một Tasker không nhận 2 đơn có giờ hẹn cách nhau dưới số giờ này.</summary>

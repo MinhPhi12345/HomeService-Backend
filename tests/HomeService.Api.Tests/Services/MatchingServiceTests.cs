@@ -56,7 +56,7 @@ public class MatchingServiceTests : TestBase
     [Fact]
     public async Task Process_GanGioHenMaKhongCoAi_ChuyenChuaCoTaskerNhan()
     {
-        NewBooking(hoursUntil: 1.5);
+        NewBooking(hoursUntil: 0.5); // còn 30 phút < mốc dừng 45 phút (BR-M05)
 
         await CreateMatching().ProcessDueBookingsAsync();
 

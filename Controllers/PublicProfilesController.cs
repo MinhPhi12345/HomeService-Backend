@@ -3,6 +3,7 @@ using HomeService.Api.Data;
 using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
 using HomeService.Api.Extensions;
+using HomeService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -55,6 +56,7 @@ public class PublicProfilesController : ControllerBase
         reviews = reviews.Select(r => r with { ReviewerName = NameHelper.GivenName(r.ReviewerName) }).ToList();
 
         var profile = user.TaskerProfile;
+        var badges = isTasker ? (await TaskerAwardService.BadgesAsync(_db, new[] { userId })).GetValueOrDefault(userId) : null;
         return Ok(new PublicProfileResponse(
             user.Id,
             sharedBooking || isAdmin || viewerId == userId ? user.FullName : NameHelper.GivenName(user.FullName),
@@ -67,6 +69,7 @@ public class PublicProfilesController : ControllerBase
             isTasker ? profile?.VerificationStatus == TaskerVerificationStatus.Approved : null,
             isTasker ? profile?.WorkingArea : null,
             isTasker ? profile?.Skills : null,
-            reviews));
+            reviews,
+            isTasker ? badges ?? new List<AwardBadgeResponse>() : null));
     }
 }

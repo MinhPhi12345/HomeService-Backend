@@ -22,10 +22,12 @@ public class SettlementService
     private readonly AuditService _audit;
     private readonly ILogger<SettlementService> _logger;
     private readonly SettlementOptions _opt;
+    private readonly VoucherService _vouchers;
 
     public SettlementService(AppDbContext db, WalletService wallet, INotificationService notifications,
-        AuditService audit, ILogger<SettlementService> logger, IOptions<SettlementOptions> options)
+        AuditService audit, ILogger<SettlementService> logger, IOptions<SettlementOptions> options, VoucherService vouchers)
     {
+        _vouchers = vouchers;
         _db = db;
         _wallet = wallet;
         _notifications = notifications;
@@ -36,12 +38,14 @@ public class SettlementService
 
     /// <summary>
     /// US22 – Tính chiết khấu nền tảng khi giải ngân (BR-P01):
-    /// commission = làm tròn((amount − refundedAmount) × commissionRate); Tasker nhận phần còn lại.
-    /// Tỷ lệ lấy từ Booking.CommissionRate (đã chốt lúc tạo đơn) chứ không lấy cấu hình hiện tại.
+    /// giá trị tính cho Tasker = amount + promoSubsidy − refundedAmount (promoSubsidy = số tiền mã giảm giá, nền tảng bù – BR-V03);
+    /// commission = làm tròn(giá trị đó × commissionRate); Tasker nhận phần còn lại.
+    /// Tỷ lệ lấy từ Booking.CommissionRate (chốt lúc Tasker nhận đơn – có thể là mức ưu đãi FR-31) chứ không lấy cấu hình hiện tại.
     /// </summary>
-    public static (decimal Commission, decimal TaskerAmount) SplitOnline(decimal amount, decimal refunded, decimal rate)
+    public static (decimal Commission, decimal TaskerAmount) SplitOnline(decimal amount, decimal refunded, decimal rate,
+        decimal promoSubsidy = 0)
     {
-        var payable = amount - refunded;
+        var payable = amount + promoSubsidy - refunded;
         var commission = Money.Commission(payable, rate);
         return (commission, payable - commission);
     }
@@ -56,8 +60,10 @@ public class SettlementService
         if (payment is null || payment.Status != PaymentStatus.Held) return false;
 
         var now = DateTime.UtcNow;
-        var (commission, taskerAmount) = SplitOnline(payment.Amount, payment.RefundedAmount, booking.CommissionRate);
+        var subsidy = booking.DiscountAmount;
+        var (commission, taskerAmount) = SplitOnline(payment.Amount, payment.RefundedAmount, booking.CommissionRate, subsidy);
 
+        payment.PromoSubsidy = subsidy;
         payment.CommissionAmount = commission;
         payment.TaskerAmount = taskerAmount;
         payment.ReleasedAt = now;
@@ -73,11 +79,13 @@ public class SettlementService
 
         AssertInvariant(payment);
         _audit.Add(AuditService.Released, taskerAmount, booking.Id, payment.Id,
-            $"Giải ngân {(isAuto ? "tự động sau hạn xác nhận" : "khách xác nhận")}: Tasker {taskerAmount}, chiết khấu {commission}, đã hoàn {payment.RefundedAmount}");
+            $"Giải ngân {(isAuto ? "tự động sau hạn xác nhận" : "khách xác nhận")}: Tasker {taskerAmount}, chiết khấu {commission}, đã hoàn {payment.RefundedAmount}"
+            + (subsidy > 0 ? $", khuyến mãi nền tảng bù {subsidy} (mã {booking.VoucherCode})" : string.Empty));
 
         booking.Status = BookingStatus.Paid;
         booking.IsAutoConfirmed = isAuto;
         booking.UpdatedAt = now;
+        await _vouchers.OnBookingPaidAsync(booking);
         return true;
     }
 
@@ -97,6 +105,7 @@ public class SettlementService
         payment.RefundedAmount = refund;
         payment.TaskerAmount = feeToTasker;
         payment.CommissionAmount = 0;
+        payment.PromoSubsidy = 0; // không thực hiện dịch vụ → nền tảng không bù khuyến mãi
         payment.RefundedAt = now;
         payment.Status = feeToTasker > 0 ? PaymentStatus.PartiallyRefunded : PaymentStatus.Refunded;
         AssertInvariant(payment);
@@ -116,13 +125,16 @@ public class SettlementService
         return true;
     }
 
-    /// <summary>BR-P07 / NFR-16: refundedAmount + taskerAmount + commissionAmount = amount cho mọi Payment đã kết thúc.</summary>
+    /// <summary>
+    /// BR-P07 / NFR-16: refundedAmount + taskerAmount + commissionAmount = amount + promoSubsidy cho mọi Payment đã kết thúc
+    /// (promoSubsidy = phần mã giảm giá nền tảng bù cho Tasker, bằng 0 nếu đơn không dùng mã).
+    /// </summary>
     private void AssertInvariant(Payment p)
     {
-        if (p.RefundedAmount + p.TaskerAmount + p.CommissionAmount != p.Amount)
+        if (p.RefundedAmount + p.TaskerAmount + p.CommissionAmount != p.Amount + p.PromoSubsidy)
         {
-            _logger.LogError("Sai bất biến tiền ở Payment {Id}: {R} + {T} + {C} != {A}",
-                p.Id, p.RefundedAmount, p.TaskerAmount, p.CommissionAmount, p.Amount);
+            _logger.LogError("Sai bất biến tiền ở Payment {Id}: {R} + {T} + {C} != {A} + {S}",
+                p.Id, p.RefundedAmount, p.TaskerAmount, p.CommissionAmount, p.Amount, p.PromoSubsidy);
             throw new InvalidOperationException("Sai lệch số tiền khi quyết toán.");
         }
     }
@@ -174,5 +186,6 @@ public class SettlementService
             $"Đơn tiền mặt {booking.TotalPrice}: trừ chiết khấu {commission} từ ví Tasker #{taskerId}");
         booking.Status = BookingStatus.Paid;
         booking.UpdatedAt = now;
+        await _vouchers.OnBookingPaidAsync(booking);
     }
 }

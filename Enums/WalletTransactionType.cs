@@ -7,5 +7,6 @@ public enum WalletTransactionType
     Commission = 1,     // Trừ hoa hồng (đơn tiền mặt)
     OnlineEarning = 2,  // Thu nhập đơn online
     Withdraw = 3,       // Rút tiền
-    CancellationFee = 4 // Phí hủy được nhận
+    CancellationFee = 4, // Phí hủy được nhận
+    Bonus = 5            // Thưởng Tasker xuất sắc tháng (FR-31)
 }

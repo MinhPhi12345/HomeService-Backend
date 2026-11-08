@@ -2,7 +2,7 @@ using HomeService.Api.Enums;
 
 namespace HomeService.Api.Models;
 
-// EP05 - Thanh toán (SRS 7.5). Bất biến: RefundedAmount + TaskerAmount + CommissionAmount = Amount khi đã kết thúc.
+// EP05 - Thanh toán (SRS 7.5). Bất biến: RefundedAmount + TaskerAmount + CommissionAmount = Amount + PromoSubsidy khi đã kết thúc.
 public class Payment
 {
     public int Id { get; set; }
@@ -23,4 +23,7 @@ public class Payment
     public DateTime? ReleasedAt { get; set; }
     public DateTime? RefundedAt { get; set; }
     public string? GatewayTransactionId { get; set; } // mô phỏng cổng thanh toán
+    // FR-32 – phần giảm giá nền tảng bù cho Tasker khi giải ngân (BR-V03).
+    // Bất biến mở rộng: RefundedAmount + TaskerAmount + CommissionAmount = Amount + PromoSubsidy.
+    public decimal PromoSubsidy { get; set; }
 }

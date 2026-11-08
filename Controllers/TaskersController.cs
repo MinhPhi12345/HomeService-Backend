@@ -4,10 +4,13 @@ using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
 using HomeService.Api.Extensions;
 using HomeService.Api.Models;
+using HomeService.Api.Options;
+using HomeService.Api.Services;
 using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HomeService.Api.Controllers;
 
@@ -21,11 +24,13 @@ public class TaskersController : ControllerBase
 
     private readonly AppDbContext _db;
     private readonly INotificationService _notifications;
+    private readonly BusinessOptions _business;
 
-    public TaskersController(AppDbContext db, INotificationService notifications)
+    public TaskersController(AppDbContext db, INotificationService notifications, IOptions<BusinessOptions> business)
     {
         _db = db;
         _notifications = notifications;
+        _business = business.Value;
     }
 
     // US04 - Tasker gửi / cập nhật hồ sơ (CCCD, kỹ năng, điểm làm việc, bán kính phục vụ; khu vực tự lấy từ địa chỉ)
@@ -81,7 +86,16 @@ public class TaskersController : ControllerBase
         var userId = User.GetUserId();
         var profile = await _db.TaskerProfiles.AsNoTracking().FirstOrDefaultAsync(t => t.UserId == userId);
         if (profile is null) return NotFound();
-        return Ok(ToResponse(profile));
+        // FR-31: chiết khấu ưu đãi đang hiệu lực + huy hiệu Tasker xuất sắc tháng
+        var preferential = await TaskerAwardService.ActivePreferentialAsync(_db, userId, DateTime.UtcNow);
+        var badges = await TaskerAwardService.BadgesAsync(_db, new[] { userId });
+        return Ok(ToResponse(profile) with
+        {
+            CommissionRate = preferential is { } p && p.Rate < _business.CommissionRate ? p.Rate : _business.CommissionRate,
+            PreferentialCommissionRate = preferential?.Rate,
+            PreferentialUntil = preferential?.Until,
+            Badges = badges.GetValueOrDefault(userId) ?? new List<AwardBadgeResponse>(),
+        });
     }
 
     // US04 - Admin xem danh sách hồ sơ Tasker chờ duyệt (chỉ hồ sơ đã gửi CCCD)
@@ -128,7 +142,8 @@ public class TaskersController : ControllerBase
     [HttpPut("availability")]
     [Authorize(Roles = Roles.Tasker)]
     public async Task<IActionResult> UpdateAvailability(UpdateAvailabilityRequest request,
-        [FromServices] Microsoft.Extensions.Options.IOptions<HomeService.Api.Options.MatchingOptions> matching)
+        [FromServices] Microsoft.Extensions.Options.IOptions<HomeService.Api.Options.MatchingOptions> matching,
+        [FromServices] MatchingService? matcher = null)
     {
         var userId = User.GetUserId();
         var profile = await _db.TaskerProfiles.FirstOrDefaultAsync(t => t.UserId == userId);
@@ -140,14 +155,20 @@ public class TaskersController : ControllerBase
             throw ApiException.BadRequest(
                 $"Cần ký quỹ tối thiểu {MoneyFormat.Vnd(minDeposit)} trong ví để bật nhận đơn. Số dư khả dụng hiện là {MoneyFormat.Vnd(profile.AvailableBalance)}.");
 
+        var turnedOn = request.IsAvailable!.Value && !profile.IsAvailable;
+        var hasLocation = request.Latitude is not null && request.Longitude is not null;
         profile.IsAvailable = request.IsAvailable!.Value;
-        if (request.Latitude is not null && request.Longitude is not null)
+        if (hasLocation)
         {
             profile.LastLatitude = request.Latitude;
             profile.LastLongitude = request.Longitude;
             profile.LastLocationAt = DateTime.UtcNow;
         }
         await _db.SaveChangesAsync();
+
+        // BR-M08: vừa bật nhận đơn / gửi vị trí mới → đơn đang chờ quét lại ở gần được quét ngay
+        if (matcher is not null && profile.IsAvailable && (turnedOn || hasLocation))
+            await matcher.WakeNearbyBookingsAsync(userId);
         return NoContent();
     }
 

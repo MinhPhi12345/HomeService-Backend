@@ -16,7 +16,11 @@ public record RevenueReport(
     // Bổ sung
     decimal TaskerPayout,     // tổng tiền Tasker nhận
     string GroupBy,
-    IReadOnlyList<RevenuePoint> Series
+    IReadOnlyList<RevenuePoint> Series,
+    // FR-32 / FR-31 – chi phí khuyến mãi (mã giảm giá nền tảng bù) và tiền thưởng Tasker trong kỳ
+    decimal PromotionCost = 0,
+    decimal TaskerBonusCost = 0,
+    decimal NetRevenue = 0    // = TotalCommission − PromotionCost − TaskerBonusCost
 );
 
 /// <summary>Một điểm trên biểu đồ doanh thu theo ngày/tháng/năm (giờ Việt Nam).</summary>

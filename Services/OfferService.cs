@@ -57,8 +57,12 @@ public class OfferService
             throw ApiException.BadRequest(
                 $"Ví cần tối thiểu {MoneyFormat.Vnd(_matching.MinWalletDeposit)} khả dụng (ký quỹ) để nhận đơn. Vui lòng nạp thêm.");
 
+        // BR-P01 / BR-T04: tỷ lệ chiết khấu chốt lúc nhận đơn = mức thấp hơn giữa mức của đơn và mức ưu đãi của Tasker
+        var preferential = await TaskerAwardService.ActivePreferentialAsync(_db, taskerId, now);
+        var rate = preferential is { } p && p.Rate < booking.CommissionRate ? p.Rate : booking.CommissionRate;
+
         // BR-P04/BR-P05: đơn tiền mặt cần đủ số dư khả dụng để tạm giữ chiết khấu
-        var commission = Money.Commission(booking.TotalPrice, booking.CommissionRate);
+        var commission = Money.Commission(booking.TotalPrice, rate);
         if (booking.PaymentMethod == PaymentMethod.Cash && profile.AvailableBalance < commission)
             throw ApiException.BadRequest("Số dư ví không đủ để nhận đơn tiền mặt này, vui lòng nạp thêm.");
 
@@ -70,6 +74,7 @@ public class OfferService
                         (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Matched))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(b => b.TaskerId, taskerId)
+                .SetProperty(b => b.CommissionRate, rate)
                 .SetProperty(b => b.Status, BookingStatus.Accepted)
                 .SetProperty(b => b.NextMatchAt, (DateTime?)null)
                 .SetProperty(b => b.UpdatedAt, now));

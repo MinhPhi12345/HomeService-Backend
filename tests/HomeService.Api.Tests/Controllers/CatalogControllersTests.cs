@@ -156,7 +156,7 @@ public class ServiceCategoriesControllerTests : TestBase
 /// <summary>US04 / US16 – TaskersController.</summary>
 public class TaskersControllerTests : TestBase
 {
-    private TaskersController Controller() => new(Db, CreateNotifications());
+    private TaskersController Controller() => new(Db, CreateNotifications(), MsOptions.Create(BusinessOptions));
 
     private static TaskerProfileRequest ProfileRequest(string idCard = "079123456789", int radius = 5, string? area = "Quận 1") => new()
     {

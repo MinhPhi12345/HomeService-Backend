@@ -34,6 +34,10 @@ public class CreateBookingRequest
     /// <summary>Bổ sung: SĐT để Tasker liên hệ cho đơn này (0 + 9 số). Bỏ trống => dùng SĐT trong hồ sơ.</summary>
     [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại liên hệ không hợp lệ.")]
     public string? ContactPhone { get; set; }
+
+    /// <summary>FR-32: mã giảm giá (không bắt buộc, chỉ đơn trả trước). Không phân biệt hoa thường.</summary>
+    [MaxLength(30, ErrorMessage = "Mã giảm giá không tồn tại.")]
+    public string? VoucherCode { get; set; }
 }
 
 // US18 – body của PUT /api/bookings/{id}/status
@@ -96,6 +100,21 @@ public class BookingResponse
     public bool CanReview { get; init; }
     /// <summary>Bổ sung: SĐT liên hệ của đơn – khách luôn thấy; Tasker chỉ thấy khi đơn đang 2/3 (giống customerPhone).</summary>
     public string? ContactPhone { get; init; }
+
+    // FR-32 – khuyến mãi: totalPrice là giá gốc; khách trả payableAmount = totalPrice − discountAmount
+    public decimal DiscountAmount { get; init; }
+    public decimal PayableAmount { get; init; }
+    public string? VoucherCode { get; init; }
+    // FR-31 – huy hiệu Tasker xuất sắc tháng của Tasker phụ trách (chỉ trả ở GET /api/bookings/{id})
+    public IReadOnlyList<string>? TaskerBadges { get; set; }
+    // BR-M05/M07 – đơn đã quét hết các đợt mà chưa ai nhận, hệ thống vẫn đang tìm tiếp (null nếu không ở tình huống này)
+    public DateTime? SearchExhaustedAt { get; set; }
+    /// <summary>Lần tự quét lại kế tiếp (null khi đang gửi lời mời).</summary>
+    public DateTime? NextSearchAt { get; set; }
+    /// <summary>Mốc dừng tìm: giờ hẹn − 45 phút; sau mốc này đơn chuyển "Chưa có Tasker nhận".</summary>
+    public DateTime? SearchStopsAt { get; set; }
+    /// <summary>Từ thời điểm này khách mới bấm lại được "Tìm lại ngay" (null = bấm được ngay).</summary>
+    public DateTime? SearchNowAvailableAt { get; set; }
 }
 
 // US14 – GET /api/bookings/{id}/cancellation-fee

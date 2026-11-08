@@ -18,6 +18,14 @@ public class AuditService
     public const string WalletWithdraw = "WalletWithdraw";
     public const string ReviewKept = "ReviewKept";       // US27 – Admin giữ lại đánh giá bị báo cáo
     public const string ReviewRemoved = "ReviewRemoved"; // US27 – Admin gỡ đánh giá bị báo cáo
+    public const string TaskerAwardApproved = "TaskerAwardApproved";           // FR-31 – duyệt Tasker xuất sắc tháng
+    public const string TaskerBonus = "TaskerBonus";                           // FR-31 – cộng tiền thưởng vào ví
+    public const string TaskerAwardGiftEmail = "TaskerAwardGiftEmail";         // FR-31 – gửi email mời nhận quà
+    public const string TaskerAwardGiftDelivered = "TaskerAwardGiftDelivered"; // FR-31 – đã trao quà
+    public const string TaskerAwardExport = "TaskerAwardExport";               // FR-31 – xuất Excel (có email, SĐT)
+    public const string VoucherCreated = "VoucherCreated";                     // FR-32 – tạo chương trình
+    public const string VoucherUpdated = "VoucherUpdated";                     // FR-32 – sửa / tạm dừng / kết thúc
+    public const string GiftRuleUpdated = "GiftRuleUpdated";                   // FR-33 – đổi cài đặt quà tặng
 
     private readonly AppDbContext _db;
     private readonly IHttpContextAccessor _http;

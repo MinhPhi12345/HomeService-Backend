@@ -25,7 +25,14 @@ public class Booking
     // SĐT liên hệ cho riêng đơn này (khách nhập khi đặt; bỏ trống => lấy SĐT hồ sơ lúc đặt)
     public string? ContactPhone { get; set; }
     public int Quantity { get; set; } = 1;        // số giờ / số lần (1–12)
-    public decimal TotalPrice { get; set; }       // = basePrice × quantity (BR-B01)
+    public decimal TotalPrice { get; set; }       // = basePrice × quantity (BR-B01) – giá gốc, Tasker được tính theo giá này
+
+    // FR-32 – mã giảm giá (chỉ đơn trả trước): khách trả TotalPrice − DiscountAmount, nền tảng chịu phần giảm (BR-V03)
+    public int? VoucherId { get; set; }
+    public Voucher? Voucher { get; set; }
+    public string? VoucherCode { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal PayableAmount => TotalPrice - DiscountAmount; // không lưu DB
 
     public BookingStatus Status { get; set; } = BookingStatus.Pending;
 
@@ -42,10 +49,13 @@ public class Booking
     public int MatchRound { get; set; } = 1;  // tăng khi khách bấm Thử lại
     public int CurrentWave { get; set; } = 0; // 0 = chưa bắt đầu, 1–3
     public DateTime? NextMatchAt { get; set; } // lần xử lý ghép nối kế tiếp
+    public DateTime? SearchExhaustedAt { get; set; } // BR-M05: lần đầu quét hết các đợt mà chưa ai nhận (trong vòng hiện tại)
+    public DateTime? ManualSearchAvailableAt { get; set; } // BR-M07: thời điểm khách được bấm "Tìm lại ngay" lần tiếp theo
 
     // US18 – ảnh check-in/check-out (bằng chứng khi khiếu nại, không sửa/xóa được)
     public string? CheckInPhotoUrl { get; set; }
     public string? CheckOutPhotoUrl { get; set; }
+    public DateTime? StartedAt { get; set; } // lúc Tasker bấm Bắt đầu (tính tỷ lệ đúng giờ – FR-31)
 
     // US34 – xác nhận hoàn thành & giải ngân
     public DateTime? CompletedAt { get; set; }     // lúc Tasker bấm Hoàn thành; mốc tính hạn khiếu nại

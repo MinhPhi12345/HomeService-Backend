@@ -101,7 +101,14 @@ public class BookingsController : ControllerBase
         var allowed = User.IsInRole(UserRole.Admin) || booking.CustomerId == userId || booking.TaskerId == userId;
         if (!allowed) return Forbid();
 
-        return Ok(BookingMapper.ToResponse(booking, DateTime.UtcNow, userId, _settlementOptions.DisputeHours));
+        var response = BookingMapper.ToResponse(booking, DateTime.UtcNow, userId, _settlementOptions.DisputeHours);
+        if (booking.TaskerId is { } taskerId)
+        {
+            // FR-31 – huy hiệu Tasker xuất sắc tháng của Tasker phụ trách
+            var badges = await TaskerAwardService.BadgesAsync(_db, new[] { taskerId });
+            response.TaskerBadges = badges.GetValueOrDefault(taskerId)?.Select(b => b.Label).ToList() ?? new List<string>();
+        }
+        return Ok(response);
     }
 
     // US17 - Tasker nhận lời mời – người nhận đầu tiên thắng (409 nếu đơn đã có Tasker khác nhận / lời mời hết hạn)
@@ -170,6 +177,15 @@ public class BookingsController : ControllerBase
         var dispute = await disputes.CreateAsync(id, CurrentUserId, request);
         var full = await disputes.QueryWithDetails().FirstAsync(d => d.Id == dispute.Id);
         return StatusCode(StatusCodes.Status201Created, disputes.ToResponse(full));
+    }
+
+    // US33 / BR-M07 - "Tìm lại ngay": đơn đã quét hết mà chưa ai nhận, không cần chờ lượt quét lại tự động
+    [HttpPost("{id:int}/search-now")]
+    [Authorize(Roles = Roles.Customer)]
+    public async Task<IActionResult> SearchNow(int id)
+    {
+        await _bookingService.SearchNowAsync(id, CurrentUserId);
+        return NoContent();
     }
 
     // US33 - Thử lại ghép nối (body tùy chọn { "scheduledTime": "..." } để đổi giờ)

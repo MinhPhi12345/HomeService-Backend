@@ -1,6 +1,7 @@
 using HomeService.Api.DTOs;
 using HomeService.Api.Enums;
 using HomeService.Api.Models;
+using HomeService.Api.Options;
 
 namespace HomeService.Api.Services;
 
@@ -9,7 +10,8 @@ public static class BookingMapper
     public const int DefaultDisputeHours = 24;
 
     /// <summary>Cần Include: Customer, Tasker, ServiceCategory, Payment, Dispute, Reviews.</summary>
-    public static BookingResponse ToResponse(Booking b, DateTime nowUtc, int? viewerId = null, int disputeHours = DefaultDisputeHours)
+    public static BookingResponse ToResponse(Booking b, DateTime nowUtc, int? viewerId = null, int disputeHours = DefaultDisputeHours,
+        int searchStopMinutes = MatchingOptions.DefaultStopSearchMinutes)
     {
         var activeJob = b.Status is BookingStatus.Accepted or BookingStatus.InProgress;
         var showContact = activeJob && viewerId is not null && (viewerId == b.TaskerId || viewerId == b.CustomerId);
@@ -17,7 +19,18 @@ public static class BookingMapper
         var isParty = viewerId is not null && b.TaskerId is not null && (viewerId == b.TaskerId || viewerId == b.CustomerId);
         var canReview = finished && isParty && b.Reviews.All(r => r.ReviewerId != viewerId);
         var isCustomer = viewerId is not null && viewerId == b.CustomerId;
-        return Map(b, nowUtc, disputeHours, showContact, canReview, isCustomer);
+        var r = Map(b, nowUtc, disputeHours, showContact, canReview, isCustomer);
+        // BR-M05/M07: đơn đã quét hết mà chưa ai nhận, hệ thống vẫn đang tìm tiếp
+        var searching = b.TaskerId == null && b.SearchExhaustedAt != null &&
+                        b.Status is BookingStatus.Pending or BookingStatus.Matched;
+        if (searching)
+        {
+            r.SearchExhaustedAt = b.SearchExhaustedAt;
+            r.NextSearchAt = b.Status == BookingStatus.Pending ? b.NextMatchAt : null;
+            r.SearchStopsAt = b.ScheduledTime.AddMinutes(-searchStopMinutes);
+            r.SearchNowAvailableAt = b.ManualSearchAvailableAt;
+        }
+        return r;
     }
 
     private static BookingResponse Map(Booking b, DateTime nowUtc, int disputeHours, bool showContact, bool canReview,
@@ -60,5 +73,8 @@ public static class BookingMapper
         TaskerPhone = showContact ? b.Tasker?.PhoneNumber : null,
         CanReview = canReview,
         ContactPhone = isCustomer || showContact ? b.ContactPhone ?? b.Customer?.PhoneNumber : null,
+        DiscountAmount = b.DiscountAmount,
+        PayableAmount = b.PayableAmount,
+        VoucherCode = b.VoucherCode,
     };
 }

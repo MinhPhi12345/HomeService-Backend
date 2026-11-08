@@ -49,7 +49,12 @@ public record TaskerProfileResponse(
     string BaseAddress,
     double BaseLatitude,
     double BaseLongitude,
-    int ServiceRadiusKm
+    int ServiceRadiusKm,
+    // FR-31 – ưu đãi Tasker xuất sắc tháng (chỉ trả ở GET /api/taskers/profile)
+    decimal? CommissionRate = null,             // tỷ lệ chiết khấu sẽ áp cho đơn nhận lúc này
+    decimal? PreferentialCommissionRate = null, // mức ưu đãi đang hiệu lực (null = không có)
+    DateTime? PreferentialUntil = null,
+    IReadOnlyList<AwardBadgeResponse>? Badges = null
 );
 
 // Phần tử của GET /api/taskers/pending-verification

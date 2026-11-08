@@ -20,6 +20,10 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Dispute> Disputes => Set<Dispute>();
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
+    public DbSet<TaskerMonthlyAward> TaskerMonthlyAwards => Set<TaskerMonthlyAward>();
+    public DbSet<Voucher> Vouchers => Set<Voucher>();
+    public DbSet<VoucherRedemption> VoucherRedemptions => Set<VoucherRedemption>();
+    public DbSet<GiftRule> GiftRules => Set<GiftRule>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -207,6 +211,51 @@ public class AppDbContext : DbContext
             e.Property(o => o.CodeHash).HasMaxLength(64).IsUnicode(false);
             e.HasIndex(o => new { o.UserId, o.Purpose, o.CreatedAt });
             e.HasOne(o => o.User).WithMany().HasForeignKey(o => o.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EP09 – Tasker xuất sắc tháng (FR-31)
+        modelBuilder.Entity<TaskerMonthlyAward>(e =>
+        {
+            e.HasIndex(a => new { a.Year, a.Month, a.TaskerId }).IsUnique();
+            e.HasIndex(a => new { a.TaskerId, a.Status });
+            e.Property(a => a.Score).HasPrecision(7, 4);
+            e.Property(a => a.RatingAverage).HasPrecision(3, 2);
+            e.Property(a => a.AcceptanceRate).HasPrecision(5, 4);
+            e.Property(a => a.OnTimeRate).HasPrecision(5, 4);
+            e.Property(a => a.PreferentialRate).HasPrecision(5, 4);
+            e.Property(a => a.ExcludeReason).HasMaxLength(500);
+            e.Property(a => a.GiftDescription).HasMaxLength(200);
+            e.Property(a => a.GiftInvitation).HasMaxLength(1000);
+            e.HasOne(a => a.Tasker).WithMany().HasForeignKey(a => a.TaskerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // EP10 – Mã giảm giá & quà tặng (FR-32, FR-33)
+        modelBuilder.Entity<Voucher>(e =>
+        {
+            e.Property(v => v.Code).HasMaxLength(30).IsUnicode(false);
+            e.HasIndex(v => v.Code).IsUnique();
+            e.Property(v => v.Name).HasMaxLength(100);
+            e.Property(v => v.Description).HasMaxLength(300);
+            e.Property(v => v.ServiceCategoryIds).HasMaxLength(200).IsUnicode(false);
+            e.HasIndex(v => new { v.AssignedCustomerId, v.Source });
+            e.HasOne(v => v.AssignedCustomer).WithMany().HasForeignKey(v => v.AssignedCustomerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<VoucherRedemption>(e =>
+        {
+            e.HasIndex(r => r.BookingId).IsUnique();
+            e.HasIndex(r => new { r.VoucherId, r.CustomerId, r.Status });
+            e.HasOne(r => r.Voucher).WithMany(v => v.Redemptions).HasForeignKey(r => r.VoucherId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Booking).WithMany().HasForeignKey(r => r.BookingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GiftRule>(e => e.HasIndex(g => g.Kind).IsUnique());
+
+        modelBuilder.Entity<Booking>(e =>
+        {
+            e.Property(b => b.VoucherCode).HasMaxLength(30).IsUnicode(false);
+            e.Ignore(b => b.PayableAmount);
+            e.HasOne(b => b.Voucher).WithMany().HasForeignKey(b => b.VoucherId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Notification>(e =>

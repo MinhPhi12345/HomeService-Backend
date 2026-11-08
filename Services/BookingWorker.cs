@@ -12,6 +12,7 @@ public class BookingWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingWorker> _logger;
     private readonly MatchingOptions _matching;
+    private DateTime _nextAwardCheck = DateTime.MinValue;
 
     public BookingWorker(IServiceScopeFactory scopeFactory, ILogger<BookingWorker> logger, IOptions<MatchingOptions> matching)
     {
@@ -31,6 +32,13 @@ public class BookingWorker : BackgroundService
             await RunStepAsync<BookingJobs>(s => s.ExpireNoTaskerFoundAsync(stoppingToken), "hết hạn đơn chưa có Tasker", stoppingToken);
             await RunStepAsync<BookingJobs>(s => s.DetectNoShowAsync(stoppingToken), "phát hiện Tasker không đến", stoppingToken);
             await RunStepAsync<BookingJobs>(s => s.SendAppointmentRemindersAsync(stoppingToken), "nhắc lịch hẹn", stoppingToken);
+            // FR-31: đầu mỗi tháng tự chốt bảng xếp hạng Tasker xuất sắc tháng trước (kiểm tra 30 phút/lần)
+            if (DateTime.UtcNow >= _nextAwardCheck)
+            {
+                _nextAwardCheck = DateTime.UtcNow.AddMinutes(30);
+                await RunStepAsync<TaskerAwardService>(s => s.EnsurePreviousMonthComputedAsync(stoppingToken),
+                    "chốt Tasker xuất sắc tháng", stoppingToken);
+            }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
