@@ -10,6 +10,7 @@ namespace HomeService.Api.Data;
 /// 1) Tự áp dụng migration (không cần gõ "dotnet ef database update" – kể cả khi chạy bằng Docker).
 /// 2) Tạo sẵn tài khoản Admin (SRS 2.4: Admin không tự đăng ký được).
 /// 3) (Tùy chọn) Tạo vài danh mục dịch vụ mẫu để test nhanh.
+/// 4) (Tùy chọn, mặc định tắt) Seed:DemoData = true → tạo bộ dữ liệu demo đầy đủ (xem <see cref="DemoDataSeeder"/>).
 /// </summary>
 public static class DbInitializer
 {
@@ -40,6 +41,12 @@ public static class DbInitializer
         await NormalizeUploadUrlsAsync(db, logger);
         await SyncWorkingAreasAsync(db, logger);
         if (config.GetValue("Seed:SampleData", true)) await SeedSampleServicesAsync(db);
+        if (config.GetValue("Seed:DemoData", false))
+        {
+            var env = scope.ServiceProvider.GetService<IWebHostEnvironment>();
+            var uploads = env is null ? null : Options.StorageOptions.ResolveUploadsPath(config, env.ContentRootPath);
+            await DemoDataSeeder.SeedAsync(db, config, uploads, logger);
+        }
     }
 
     /// <summary>

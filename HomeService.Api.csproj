@@ -32,6 +32,11 @@
     <None Remove="wwwroot\uploads\**" />
   </ItemGroup>
 
+  <!-- Ảnh minh họa cho dữ liệu demo (Seed:DemoData) – nhúng vào DLL, chép ra wwwroot/uploads/demo khi seed -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\DemoAssets\*.jpg" />
+  </ItemGroup>
+
   <!-- Project unit test nằm trong tests/ có csproj riêng: không biên dịch / đóng gói chung với API -->
   <ItemGroup>
     <Compile Remove="tests\**" />
