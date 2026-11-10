@@ -160,6 +160,8 @@ public static class OtpEmail
                 "Bạn vừa yêu cầu đổi mật khẩu khi đang đăng nhập. Nhập mã dưới đây để xác nhận:"),
             OtpPurpose.Withdraw => ("Mã xác nhận rút tiền ví HomeService",
                 $"Bạn vừa yêu cầu rút {MoneyFormat.Vnd(amount ?? 0)} từ ví Tasker. Nhập mã dưới đây để xác nhận lệnh rút:"),
+            OtpPurpose.AccountAppeal => ("Mã xác thực gửi yêu cầu mở khóa tài khoản",
+                "Bạn vừa yêu cầu gửi đơn mở khóa tài khoản HomeService. Nhập mã dưới đây để tiếp tục:"),
             _ => ("Mã xác thực HomeService", "Mã xác thực của bạn:"),
         };
         subject = $"[HomeService] {subject}";

@@ -262,7 +262,10 @@ public class BookingsController : ControllerBase
         .Include(x => x.ServiceCategory)
         .Include(x => x.Payment)
         .Include(x => x.Dispute)
-        .Include(x => x.Reviews);
+        .Include(x => x.Reviews)
+        .Include(x => x.Items)
+        .Include(x => x.Photos)
+        .AsSplitQuery();
 
     private async Task<BookingResponse> ToResponse(int id)
     {

@@ -73,9 +73,10 @@ public static class Seed
     }
 
     public static ServiceCategory Service(this AppDbContext db, string name = "Dọn dẹp nhà", decimal price = 150_000m,
-        bool isActive = true, string unit = "giờ")
+        bool isActive = true, string unit = "giờ", Action<ServiceCategory>? configure = null)
     {
         var s = new ServiceCategory { Name = name, BasePrice = price, Unit = unit, IsActive = isActive, Description = "Mô tả" };
+        configure?.Invoke(s);
         db.ServiceCategories.Add(s);
         db.SaveChanges();
         return s;

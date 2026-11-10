@@ -1,4 +1,5 @@
 using HomeService.Api.DTOs;
+using HomeService.Api.Enums;
 using HomeService.Api.Services;
 using HomeService.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,9 @@ public class AuthController : ControllerBase
 {
     /// <summary>Mã lỗi trong body 403 khi đăng nhập tài khoản chưa xác thực email – FE mở màn nhập OTP.</summary>
     public const string EmailNotVerifiedCode = "EMAIL_NOT_VERIFIED";
+
+    /// <summary>Mã lỗi trong body 403 khi tài khoản bị khóa – FE hiện lý do và nút "Gửi yêu cầu mở khóa".</summary>
+    public const string AccountLockedCode = "ACCOUNT_LOCKED";
 
     private readonly IAuthService _authService;
 
@@ -56,6 +60,20 @@ public class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Unauthorized(new { message = ex.Message });
+        }
+        catch (AccountLockedException ex)
+        {
+            var u = ex.User;
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Tài khoản đã bị khóa.",
+                code = AccountLockedCode,
+                email = u.Email,
+                lockReason = u.LockReason,
+                lockReasonText = u.LockReason is null ? null : AccountLockReasonText.Of(u.LockReason),
+                lockDetail = u.LockDetail,
+                lockedAt = u.LockedAt,
+            });
         }
         catch (EmailNotVerifiedException ex)
         {

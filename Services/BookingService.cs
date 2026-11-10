@@ -60,11 +60,21 @@ public class BookingService : IBookingService
 
         var customer = await _db.Users.FirstAsync(u => u.Id == customerId);
 
+        // US30: tài khoản đang chờ khóa không đặt thêm đơn mới
+        if (customer.LockPendingAt is not null)
+            throw ApiException.BadRequest("Tài khoản của bạn đang chờ khóa nên không thể đặt đơn mới.");
+
         // FR-27 / BR-U01: khách đang nợ không tạo được đơn mới
         if (customer.OutstandingAmount > 0)
             throw ApiException.BadRequest("Vui lòng thanh toán khoản nợ trước khi đặt đơn mới.");
 
-        var quantity = request.Quantity ?? 1;
+        // BR-B01 (SRS v1.8): số lượng trong khoảng min–max riêng của từng dịch vụ
+        var quantity = request.Quantity ?? service.MinQuantity;
+        if (quantity < service.MinQuantity || quantity > service.MaxQuantity)
+            throw ApiException.BadRequest(service.MinQuantity == service.MaxQuantity
+                ? $"Dịch vụ này chỉ đặt {service.MinQuantity} {service.Unit} mỗi đơn."
+                : $"Số lượng của dịch vụ này từ {service.MinQuantity} đến {service.MaxQuantity} {service.Unit}.");
+        var items = ValidateItems(service, quantity, request.Items);
         var totalPrice = service.BasePrice * quantity; // BR-B01 – FE không gửi giá
         var customerPresent = request.CustomerPresent ?? false;
 
@@ -98,12 +108,15 @@ public class BookingService : IBookingService
                 ? customer.PhoneNumber
                 : request.ContactPhone.Trim(),
             Quantity = quantity,
+            EstimatedMinutes = Math.Max(1, service.MinutesPerUnit) * quantity, // BR-B02 – chốt thời lượng lúc đặt
             TotalPrice = totalPrice,
             PaymentMethod = method,
             CommissionRate = _business.CommissionRate, // BR-P01: tỷ lệ chung; chốt lại theo Tasker lúc nhận đơn (FR-31)
             CustomerPresent = customerPresent,
             CreatedAt = now,
         };
+        for (var i = 0; i < items.Count; i++)
+            booking.Items.Add(new BookingItem { ItemNo = i + 1, Description = items[i] });
 
         if (method == PaymentMethod.Cash)
         {
@@ -131,6 +144,18 @@ public class BookingService : IBookingService
         return booking;
     }
 
+    /// <summary>BR-B05: dịch vụ tính theo hạng mục → khách ghi đủ từng hạng mục (mỗi hạng mục 3–200 ký tự).</summary>
+    private static List<string> ValidateItems(ServiceCategory service, int quantity, List<string>? items)
+    {
+        if (!service.RequiresItemList) return new List<string>();
+        var list = (items ?? new List<string>()).Select(x => (x ?? string.Empty).Trim()).ToList();
+        if (list.Count != quantity || list.Any(x => x.Length == 0))
+            throw ApiException.BadRequest($"Vui lòng ghi rõ {quantity} hạng mục cần làm (mỗi dòng một hạng mục).");
+        if (list.Any(x => x.Length < 3 || x.Length > 200))
+            throw ApiException.BadRequest("Mỗi hạng mục cần mô tả từ 3 đến 200 ký tự.");
+        return list;
+    }
+
     public DateTime ValidateScheduledTime(DateTime scheduledTime)
     {
         var utc = DateTimeHelper.ToUtc(scheduledTime);
@@ -146,6 +171,7 @@ public class BookingService : IBookingService
         var booking = await _db.Bookings
             .Include(b => b.Payment)
             .Include(b => b.ServiceCategory)
+            .Include(b => b.Items)
             .FirstOrDefaultAsync(b => b.Id == bookingId)
             ?? throw ApiException.NotFound();
         if (booking.TaskerId != taskerId) throw ApiException.Forbidden();
@@ -153,11 +179,10 @@ public class BookingService : IBookingService
 
         var now = DateTime.UtcNow;
         var target = request.Status!.Value;
-        var photo = UploadUrl.Normalize(request.PhotoUrl);
 
         if (target == BookingStatus.InProgress && booking.Status == BookingStatus.Accepted)
         {
-            if (photo is null) throw ApiException.BadRequest("Vui lòng chụp ảnh hiện trạng.");
+            var photo = AddPhotos(booking, request, BookingPhotoStage.CheckIn, now);
             booking.Status = BookingStatus.InProgress;
             booking.CheckInPhotoUrl = photo;
             booking.StartedAt = now;
@@ -170,13 +195,12 @@ public class BookingService : IBookingService
 
         if (target == BookingStatus.Completed && booking.Status == BookingStatus.InProgress)
         {
-            if (photo is null) throw ApiException.BadRequest("Vui lòng chụp ảnh hiện trạng.");
+            if (booking.PaymentMethod == PaymentMethod.Cash && request.CashCollected != true)
+                throw ApiException.BadRequest("Vui lòng xác nhận đã thu đủ tiền mặt hoặc chọn \"Khách chưa thanh toán\".");
+            var photo = AddPhotos(booking, request, BookingPhotoStage.CheckOut, now);
 
             if (booking.PaymentMethod == PaymentMethod.Cash)
             {
-                if (request.CashCollected != true)
-                    throw ApiException.BadRequest("Vui lòng xác nhận đã thu đủ tiền mặt hoặc chọn \"Khách chưa thanh toán\".");
-
                 await using var tx = await _db.Database.BeginTransactionAsync();
                 booking.CheckOutPhotoUrl = photo;
                 booking.CompletedAt = now; // mốc tính hạn khiếu nại 24 giờ
@@ -210,6 +234,57 @@ public class BookingService : IBookingService
         }
 
         throw ApiException.BadRequest("Chuyển trạng thái không hợp lệ.");
+    }
+
+    public const int MaxPhotosPerItem = 3;
+    public const int MaxPhotosGeneral = 5;
+
+    /// <summary>
+    /// US18 / BR-B05 – ảnh lúc Bắt đầu / Hoàn thành. Dịch vụ tính theo hạng mục: mỗi hạng mục 1–3 ảnh;
+    /// dịch vụ khác: 1–5 ảnh. Vẫn nhận photoUrl (1 ảnh) của app cũ. Trả về ảnh đầu tiên (lưu vào CheckIn/CheckOutPhotoUrl).
+    /// </summary>
+    private string AddPhotos(Booking booking, UpdateBookingStatusRequest request, BookingPhotoStage stage, DateTime now)
+    {
+        var photos = (request.Photos ?? new List<BookingPhotoInput>())
+            .Select(p => (Url: UploadUrl.Normalize(p.Url), p.ItemNo, Note: string.IsNullOrWhiteSpace(p.Note) ? null : p.Note.Trim()))
+            .Where(p => p.Url is not null)
+            .ToList();
+        var legacy = UploadUrl.Normalize(request.PhotoUrl);
+        if (photos.Count == 0 && legacy is not null) photos.Add((legacy, null, null));
+        if (photos.Count == 0) throw ApiException.BadRequest("Vui lòng chụp ảnh hiện trạng.");
+        if (photos.Any(p => p.Note is { Length: > 200 })) throw ApiException.BadRequest("Ghi chú ảnh tối đa 200 ký tự.");
+
+        var byItem = booking.ServiceCategory?.RequiresItemList == true && booking.Items.Count > 0;
+        if (byItem)
+        {
+            var itemNos = booking.Items.Select(i => i.ItemNo).ToHashSet();
+            if (photos.Any(p => p.ItemNo is null || !itemNos.Contains(p.ItemNo.Value)))
+                throw ApiException.BadRequest("Vui lòng chụp ảnh theo từng hạng mục của đơn.");
+            foreach (var item in booking.Items.OrderBy(i => i.ItemNo))
+            {
+                var count = photos.Count(p => p.ItemNo == item.ItemNo);
+                if (count == 0)
+                    throw ApiException.BadRequest($"Vui lòng chụp ít nhất 1 ảnh cho hạng mục {item.ItemNo}: {item.Description}.");
+                if (count > MaxPhotosPerItem)
+                    throw ApiException.BadRequest($"Mỗi hạng mục tối đa {MaxPhotosPerItem} ảnh.");
+            }
+        }
+        else if (photos.Count > MaxPhotosGeneral)
+        {
+            throw ApiException.BadRequest($"Tối đa {MaxPhotosGeneral} ảnh mỗi lần.");
+        }
+
+        foreach (var p in photos)
+            _db.BookingPhotos.Add(new BookingPhoto
+            {
+                BookingId = booking.Id,
+                Stage = stage,
+                ItemNo = byItem ? p.ItemNo : null,
+                Url = p.Url!,
+                Note = p.Note,
+                CreatedAt = now,
+            });
+        return photos[0].Url!;
     }
 
     // US34 – Khách xem ảnh và xác nhận hoàn thành → giải ngân cho Tasker (FR-25)
@@ -317,6 +392,12 @@ public class BookingService : IBookingService
         await using var tx = await _db.Database.BeginTransactionAsync();
         booking.Status = BookingStatus.PaymentOverdue;
         booking.CheckOutPhotoUrl = UploadUrl.Normalize(request.PhotoUrl);
+        if (booking.CheckOutPhotoUrl is not null)
+            _db.BookingPhotos.Add(new BookingPhoto
+            {
+                BookingId = booking.Id, Stage = BookingPhotoStage.CheckOut, Url = booking.CheckOutPhotoUrl,
+                Note = "Ảnh khi báo khách chưa thanh toán", CreatedAt = now,
+            });
         booking.CompletedAt = now; // mốc 24 giờ để khách khiếu nại nếu cho rằng đã trả
         booking.UpdatedAt = now;
 

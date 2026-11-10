@@ -46,12 +46,13 @@ public class DtoValidationTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(13)]
-    public void CreateBookingRequest_SoLuongNgoai1Den12_Loi(int quantity)
+    [InlineData(51)]
+    public void CreateBookingRequest_SoLuongNgoai1Den50_Loi(int quantity)
     {
+        // Giới hạn chi tiết theo từng dịch vụ (min–max) do BookingService kiểm tra; DTO chỉ chặn giá trị vô lý
         var req = ValidBooking();
         req.Quantity = quantity;
-        Assert.Contains(Validate(req), r => r.ErrorMessage == "Số lượng từ 1 đến 12.");
+        Assert.Contains(Validate(req), r => r.ErrorMessage == "Số lượng không hợp lệ.");
     }
 
     [Theory]

@@ -207,7 +207,7 @@ public class MatchingService
             .Include(p => p.User)
             .FirstOrDefaultAsync(p => p.UserId == taskerId, ct);
         if (t is null || !t.IsAvailable || t.VerificationStatus != TaskerVerificationStatus.Approved ||
-            t.User is null || !t.User.IsActive || (t.SuspendedUntil != null && t.SuspendedUntil > now))
+            t.User is null || !t.User.IsActive || t.User.LockPendingAt != null || (t.SuspendedUntil != null && t.SuspendedUntil > now))
             return 0;
 
         var useLast = t.LastLocationAt != null && t.LastLocationAt >= now.AddMinutes(-_opt.LocationFreshMinutes)
@@ -259,6 +259,7 @@ public class MatchingService
             .Where(t => t.VerificationStatus == TaskerVerificationStatus.Approved
                         && t.IsAvailable
                         && t.User!.IsActive
+                        && t.User.LockPendingAt == null
                         && (t.SuspendedUntil == null || t.SuspendedUntil <= now)
                         && !invited.Contains(t.UserId))
             .ToListAsync(ct);
@@ -282,16 +283,10 @@ public class MatchingService
 
         var ids = inRange.Select(x => x.Profile.UserId).ToList();
 
-        // BR-B02: không trùng lịch với đơn Accepted/InProgress khác (cách nhau dưới 2 giờ)
-        var gapFrom = booking.ScheduledTime.AddHours(-_opt.ScheduleGapHours);
-        var gapTo = booking.ScheduledTime.AddHours(_opt.ScheduleGapHours);
-        var busy = await _db.Bookings
-            .Where(b => b.TaskerId != null && ids.Contains(b.TaskerId.Value) && b.Id != booking.Id
-                        && (b.Status == BookingStatus.Accepted || b.Status == BookingStatus.InProgress)
-                        && b.ScheduledTime > gapFrom && b.ScheduledTime < gapTo)
-            .Select(b => b.TaskerId!.Value)
-            .Distinct()
-            .ToListAsync(ct);
+        // BR-B02: không chồng lịch với đơn Accepted/InProgress khác (theo thời lượng ước tính + thời gian di chuyển)
+        var busy = (await TaskerSchedule.FindConflictsAsync(_db, ids, booking, _opt.TravelBufferMinutes, ct))
+            .Select(c => c.TaskerId)
+            .ToHashSet();
 
         // Số liệu chấm điểm: tỷ lệ nhận đơn 30 ngày & lần nhận đơn gần nhất
         var since = now.AddDays(-30);

@@ -260,10 +260,16 @@ public class AuthServiceTests : TestBase
         await RegisterVerified("khoa@test.vn");
         var user = await Db.Users.SingleAsync();
         user.IsActive = false;
+        user.LockReason = AccountLockReason.NonPayment;
+        user.LockDetail = "Nợ đơn #12 quá 7 ngày";
         await Db.SaveChangesAsync();
 
-        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => CreateService().LoginAsync(new LoginRequest("khoa@test.vn", "Matkhau123")));
+        // Đúng mật khẩu → báo khóa kèm lý do (FE hiện nút gửi yêu cầu mở khóa)
+        var ex = await Assert.ThrowsAsync<AccountLockedException>(() => CreateService().LoginAsync(new LoginRequest("khoa@test.vn", "Matkhau123")));
         Assert.Equal("Tài khoản đã bị khóa.", ex.Message);
+        Assert.Equal(AccountLockReason.NonPayment, ex.User.LockReason);
+        // Sai mật khẩu → vẫn thông báo chung, không lộ việc tài khoản bị khóa
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => CreateService().LoginAsync(new LoginRequest("khoa@test.vn", "SaiMatKhau1")));
     }
 
     [Fact]

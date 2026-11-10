@@ -37,10 +37,9 @@ public class ServiceCategoriesController : ControllerBase
 
         var result = await query
             .OrderBy(s => s.Name)
-            .Select(s => new ServiceCategoryResponse(s.Id, s.Name, s.Description, s.BasePrice, s.Unit, s.IconUrl, s.IsActive))
             .ToListAsync();
 
-        return Ok(result);
+        return Ok(result.Select(ToResponse));
     }
 
     [HttpGet("{id:int}")]
@@ -68,6 +67,7 @@ public class ServiceCategoriesController : ControllerBase
             Unit = request.Unit,
             IconUrl = UploadUrl.Normalize(request.IconUrl),
         };
+        ApplyDetails(entity, request);
         _db.ServiceCategories.Add(entity);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetById), new { id = entity.Id }, ToResponse(entity));
@@ -89,6 +89,7 @@ public class ServiceCategoriesController : ControllerBase
         entity.BasePrice = request.BasePrice;
         entity.Unit = request.Unit;
         entity.IconUrl = UploadUrl.Normalize(request.IconUrl);
+        ApplyDetails(entity, request);
 
         await _db.SaveChangesAsync();
         return NoContent();
@@ -142,6 +143,36 @@ public class ServiceCategoriesController : ControllerBase
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    /// <summary>SRS v1.8 – cấu hình số lượng, thời lượng, hạng mục & chi tiết dịch vụ. Field null = giữ giá trị cũ.</summary>
+    private static void ApplyDetails(ServiceCategory e, UpsertServiceCategoryRequest r)
+    {
+        var min = r.MinQuantity ?? e.MinQuantity;
+        var max = r.MaxQuantity ?? e.MaxQuantity;
+        if (min > max) throw ApiException.BadRequest("Số lượng tối thiểu không được lớn hơn số lượng tối đa.");
+        e.MinQuantity = min;
+        e.MaxQuantity = max;
+        if (r.QuantityLabel is not null) e.QuantityLabel = NullIfEmpty(r.QuantityLabel);
+        if (r.QuantityHint is not null) e.QuantityHint = NullIfEmpty(r.QuantityHint);
+        if (r.MinutesPerUnit is not null) e.MinutesPerUnit = r.MinutesPerUnit.Value;
+        if (r.RequiresItemList is not null) e.RequiresItemList = r.RequiresItemList.Value;
+        if (r.Includes is not null) e.Includes = CleanLines(r.Includes);
+        if (r.Excludes is not null) e.Excludes = CleanLines(r.Excludes);
+        if (r.CustomerPrepares is not null) e.CustomerPrepares = CleanLines(r.CustomerPrepares);
+        if (r.Notes is not null) e.Notes = CleanLines(r.Notes);
+    }
+
+    /// <summary>Mỗi dòng một ý: bỏ dòng trống, khoảng trắng thừa và dấu gạch đầu dòng người nhập gõ thêm.</summary>
+    private static string? CleanLines(string value)
+    {
+        var lines = value.Replace("\r", string.Empty).Split('\n')
+            .Select(l => l.Trim().TrimStart('-', '•', '*').Trim())
+            .Where(l => l.Length > 0)
+            .ToList();
+        return lines.Count == 0 ? null : string.Join("\n", lines);
+    }
+
     private static ServiceCategoryResponse ToResponse(ServiceCategory s) =>
-        new(s.Id, s.Name, s.Description, s.BasePrice, s.Unit, s.IconUrl, s.IsActive);
+        new(s.Id, s.Name, s.Description, s.BasePrice, s.Unit, s.IconUrl, s.IsActive,
+            s.MinQuantity, s.MaxQuantity, s.QuantityLabel, s.QuantityHint, s.MinutesPerUnit, s.RequiresItemList,
+            s.Includes, s.Excludes, s.CustomerPrepares, s.Notes);
 }

@@ -74,5 +74,5 @@ public class ProfileController : ControllerBase
 
     private static ProfileResponse ToResponse(User u) => new(
         u.Id, u.FullName, u.Email, u.PhoneNumber, u.Address, u.AvatarUrl, u.Role,
-        u.OutstandingAmount, u.IsCashBlocked, u.CreatedAt);
+        u.OutstandingAmount, u.IsCashBlocked, u.CreatedAt, u.LockPendingAt);
 }

@@ -107,14 +107,7 @@ public static class DemoDataSeeder
             var cats = await db.ServiceCategories.Where(c => c.IsActive).OrderBy(c => c.Id).ToListAsync();
             if (cats.Count == 0)
             {
-                cats =
-                [
-                    new() { Name = "Dọn dẹp nhà", Description = "Quét dọn, lau nhà, vệ sinh bếp và nhà tắm theo giờ.", BasePrice = 150000, Unit = "giờ" },
-                    new() { Name = "Giặt ủi", Description = "Giặt, sấy và ủi quần áo tại nhà.", BasePrice = 80000, Unit = "lần" },
-                    new() { Name = "Sửa điện nước", Description = "Sửa chữa điện, nước, thay thiết bị cơ bản.", BasePrice = 200000, Unit = "lần" },
-                    new() { Name = "Chăm sóc cây", Description = "Tưới, cắt tỉa, bón phân cây cảnh và vườn nhỏ.", BasePrice = 120000, Unit = "buổi" },
-                    new() { Name = "Nấu ăn gia đình", Description = "Đi chợ và nấu bữa ăn cho gia đình.", BasePrice = 180000, Unit = "buổi" },
-                ];
+                cats = ServiceCatalog.Defaults();
                 db.ServiceCategories.AddRange(cats);
                 await db.SaveChangesAsync();
             }
@@ -233,6 +226,12 @@ public static class DemoDataSeeder
             return g;
         }
 
+        private static readonly string[] SampleRepairItems =
+        {
+            "Vòi nước bồn rửa bếp bị rỉ", "Ổ cắm phòng khách không có điện", "Thay bóng đèn nhà tắm",
+            "Bồn cầu xả nước yếu", "Công tắc đèn phòng ngủ bị lỏng",
+        };
+
         // ---------- một đơn hoàn chỉnh (thanh toán, lời mời, ví, nhật ký) ----------
         private Booking NewBooking(User customer, string svcKey, BookingStatus status, User? tasker, DateTime sched, PaymentMethod method,
             int? qty = null, DateTime? created = null, string? note = null)
@@ -246,7 +245,19 @@ public static class DemoDataSeeder
                 Note = note, ContactPhone = customer.PhoneNumber, Quantity = q, TotalPrice = svc.BasePrice * q, Status = status,
                 CreatedAt = created ?? sched.AddDays(-1).AddHours(-_rnd.Next(1, 30)), PaymentMethod = method, CommissionRate = _rate,
                 CustomerPresent = method == PaymentMethod.Cash, MatchRound = 1, CurrentWave = tasker is null ? 0 : 1,
+                EstimatedMinutes = (svc.MinutesPerUnit > 0 ? svc.MinutesPerUnit : 120) * q,
             };
+            // SRS v1.8: dịch vụ tính theo hạng mục → đơn mẫu có danh sách hạng mục
+            if (svc.RequiresItemList)
+                for (var i = 0; i < q; i++)
+                    b.Items.Add(new BookingItem
+                    {
+                        ItemNo = i + 1,
+                        // Đơn 1 hạng mục có ghi chú → dùng luôn ghi chú làm mô tả hạng mục cho khớp
+                        Description = q == 1 && !string.IsNullOrWhiteSpace(note) && note.Length <= 200
+                            ? note
+                            : SampleRepairItems[(_bookings.Count + i) % SampleRepairItems.Length],
+                    });
             if (method != PaymentMethod.Cash) b.PaymentDueAt = b.CreatedAt.AddMinutes(15);
             b.UpdatedAt = b.CreatedAt;
             if (tasker is not null)

@@ -76,5 +76,22 @@ public static class BookingMapper
         DiscountAmount = b.DiscountAmount,
         PayableAmount = b.PayableAmount,
         VoucherCode = b.VoucherCode,
+        EstimatedMinutes = b.EstimatedMinutes,
+        ServiceUnit = b.ServiceCategory?.Unit ?? string.Empty,
+        RequiresItemList = b.ServiceCategory?.RequiresItemList == true && b.Items.Count > 0,
+        Items = b.Items.OrderBy(i => i.ItemNo).Select(i => new BookingItemDto(i.ItemNo, i.Description)).ToList(),
+        Photos = PhotosOf(b),
     };
+
+    public static List<BookingPhotoDto> PhotosOf(Booking b)
+    {
+        var photos = b.Photos.OrderBy(p => p.Stage).ThenBy(p => p.ItemNo ?? 0).ThenBy(p => p.CreatedAt).ThenBy(p => p.Id)
+            .Select(p => new BookingPhotoDto(p.Stage, p.ItemNo, p.Url, p.Note, p.CreatedAt)).ToList();
+        // Đơn cũ (trước SRS v1.8) chỉ có 1 ảnh mỗi giai đoạn trong CheckIn/CheckOutPhotoUrl
+        if (photos.All(p => p.Stage != BookingPhotoStage.CheckIn) && b.CheckInPhotoUrl is not null)
+            photos.Insert(0, new BookingPhotoDto(BookingPhotoStage.CheckIn, null, b.CheckInPhotoUrl, null, b.StartedAt ?? b.CreatedAt));
+        if (photos.All(p => p.Stage != BookingPhotoStage.CheckOut) && b.CheckOutPhotoUrl is not null)
+            photos.Add(new BookingPhotoDto(BookingPhotoStage.CheckOut, null, b.CheckOutPhotoUrl, null, b.CompletedAt ?? b.CreatedAt));
+        return photos;
+    }
 }

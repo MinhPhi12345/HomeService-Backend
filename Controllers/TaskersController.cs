@@ -149,6 +149,10 @@ public class TaskersController : ControllerBase
         var profile = await _db.TaskerProfiles.FirstOrDefaultAsync(t => t.UserId == userId);
         if (profile is null) return NotFound();
 
+        // US30: tài khoản đang chờ khóa chỉ được hoàn thành các đơn đã nhận
+        if (request.IsAvailable == true && await _db.Users.AnyAsync(u => u.Id == userId && u.LockPendingAt != null))
+            throw ApiException.BadRequest("Tài khoản của bạn đang chờ khóa: bạn chỉ hoàn thành các đơn đã nhận, không bật nhận đơn mới được.");
+
         // Ký quỹ: chỉ bật nhận đơn khi số dư khả dụng đạt mức tối thiểu
         var minDeposit = matching.Value.MinWalletDeposit;
         if (request.IsAvailable == true && !profile.IsAvailable && profile.AvailableBalance < minDeposit)

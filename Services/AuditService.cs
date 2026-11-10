@@ -26,6 +26,13 @@ public class AuditService
     public const string VoucherCreated = "VoucherCreated";                     // FR-32 – tạo chương trình
     public const string VoucherUpdated = "VoucherUpdated";                     // FR-32 – sửa / tạm dừng / kết thúc
     public const string GiftRuleUpdated = "GiftRuleUpdated";                   // FR-33 – đổi cài đặt quà tặng
+    public const string AccountLocked = "AccountLocked";                       // US30 – khóa tài khoản có hiệu lực
+    public const string AccountLockScheduled = "AccountLockScheduled";         // US30 – chờ khóa sau khi hoàn tất đơn
+    public const string AccountLockCancelled = "AccountLockCancelled";         // US30 – hủy lệnh chờ khóa
+    public const string AccountUnlocked = "AccountUnlocked";                   // US30 – mở khóa
+    public const string AppealSubmitted = "AppealSubmitted";                   // US48 – người dùng gửi yêu cầu mở khóa
+    public const string AppealApproved = "AppealApproved";                     // US48 – chấp nhận yêu cầu mở khóa
+    public const string AppealRejected = "AppealRejected";                     // US48 – từ chối yêu cầu mở khóa
 
     private readonly AppDbContext _db;
     private readonly IHttpContextAccessor _http;

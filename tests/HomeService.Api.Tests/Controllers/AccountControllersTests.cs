@@ -155,7 +155,7 @@ public class ProfileControllerTests : TestBase
 /// <summary>US30 / US06 – UsersController (Admin).</summary>
 public class UsersControllerTests : TestBase
 {
-    private UsersController AsAdmin(int adminId) => new UsersController(Db).AsUser(adminId, UserRole.Admin);
+    private UsersController AsAdmin(int adminId) => new UsersController(Db, CreateLocks()).AsUser(adminId, UserRole.Admin);
 
     [Fact]
     public async Task GetAll_LocTheoVaiTro_KhongPhanBietHoaThuong()
