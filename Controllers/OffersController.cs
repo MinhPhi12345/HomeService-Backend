@@ -44,6 +44,9 @@ public class OffersController : ControllerBase
                 o.Booking.ScheduledTime, o.DistanceKm, o.Booking.TotalPrice, o.Booking.PaymentMethod,
                 o.Booking.CommissionRate, o.ExpiresAt, o.Status, o.Wave, o.Booking.Note, o.Booking.Quantity,
                 o.Booking.CustomerId,
+                o.Booking.EstimatedMinutes,
+                Unit = o.Booking.ServiceCategory.Unit,
+                Items = o.Booking.Items.OrderBy(i => i.ItemNo).Select(i => i.Description).ToList(),
             })
             .ToListAsync();
 
@@ -64,6 +67,9 @@ public class OffersController : ControllerBase
             o.ExpiresAt, o.Status, o.Wave, o.Note, o.Quantity,
             ratings.TryGetValue(o.CustomerId, out var rt) ? Math.Round((decimal)rt.Avg, 2) : null,
             o.CustomerId,
-            rt?.Count ?? 0)));
+            rt?.Count ?? 0,
+            o.EstimatedMinutes,
+            o.Unit,
+            o.Items)));
     }
 }

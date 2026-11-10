@@ -22,8 +22,13 @@ public class CreateBookingRequest
     [MaxLength(500, ErrorMessage = "Ghi chú tối đa 500 ký tự.")]
     public string? Note { get; set; }
 
-    [Range(1, 12, ErrorMessage = "Số lượng từ 1 đến 12.")]
+    /// <summary>Số lượng theo đơn vị của dịch vụ; phải nằm trong khoảng minQuantity–maxQuantity của dịch vụ (BR-B01).</summary>
+    [Range(1, 50, ErrorMessage = "Số lượng không hợp lệ.")]
     public int? Quantity { get; set; }
+
+    /// <summary>BR-B05: dịch vụ tính theo hạng mục (requiresItemList) – mỗi phần tử là 1 hạng mục, số phần tử = quantity.</summary>
+    [MaxLength(50, ErrorMessage = "Số hạng mục không hợp lệ.")]
+    public List<string>? Items { get; set; }
 
     /// <summary>0 Tiền mặt, 1 Ví điện tử (mặc định), 2 Thẻ.</summary>
     public PaymentMethod? PaymentMethod { get; set; }
@@ -47,13 +52,36 @@ public class UpdateBookingStatusRequest
     [Required(ErrorMessage = "Chuyển trạng thái không hợp lệ.")]
     public BookingStatus? Status { get; set; }
 
-    /// <summary>Bắt buộc: URL ảnh check-in (status 3) / check-out (status 4) lấy từ POST /api/uploads.</summary>
+    /// <summary>App cũ: 1 URL ảnh check-in (status 3) / check-out (status 4) lấy từ POST /api/uploads.</summary>
     [MaxLength(500)]
     public string? PhotoUrl { get; set; }
+
+    /// <summary>
+    /// SRS v1.8: nhiều ảnh. Dịch vụ tính theo hạng mục: mỗi hạng mục 1–3 ảnh (itemNo = số thứ tự hạng mục);
+    /// dịch vụ khác: 1–5 ảnh (bỏ qua itemNo).
+    /// </summary>
+    [MaxLength(60, ErrorMessage = "Quá nhiều ảnh.")]
+    public List<BookingPhotoInput>? Photos { get; set; }
 
     /// <summary>Đơn tiền mặt, status 4: phải là true (đã thu đủ). Chưa thu → dùng report-unpaid.</summary>
     public bool? CashCollected { get; set; }
 }
+
+public class BookingPhotoInput
+{
+    [Required, MaxLength(500)]
+    public string Url { get; set; } = string.Empty;
+
+    public int? ItemNo { get; set; }
+
+    [MaxLength(200, ErrorMessage = "Ghi chú ảnh tối đa 200 ký tự.")]
+    public string? Note { get; set; }
+}
+
+public record BookingItemDto(int ItemNo, string Description);
+
+/// <summary>stage: 0 lúc Bắt đầu, 1 lúc Hoàn thành; itemNo null = ảnh chung.</summary>
+public record BookingPhotoDto(BookingPhotoStage Stage, int? ItemNo, string Url, string? Note, DateTime CreatedAt);
 
 // SRS 9.4 – BookingResponse. Field mới luôn thêm vào CUỐI để không phá FE cũ.
 public class BookingResponse
@@ -115,6 +143,13 @@ public class BookingResponse
     public DateTime? SearchStopsAt { get; set; }
     /// <summary>Từ thời điểm này khách mới bấm lại được "Tìm lại ngay" (null = bấm được ngay).</summary>
     public DateTime? SearchNowAvailableAt { get; set; }
+
+    // SRS v1.8 – thời lượng ước tính, đơn vị, hạng mục & ảnh theo hạng mục
+    public int EstimatedMinutes { get; init; }
+    public string ServiceUnit { get; init; } = string.Empty;
+    public bool RequiresItemList { get; init; }
+    public IReadOnlyList<BookingItemDto> Items { get; init; } = Array.Empty<BookingItemDto>();
+    public IReadOnlyList<BookingPhotoDto> Photos { get; init; } = Array.Empty<BookingPhotoDto>();
 }
 
 // US14 – GET /api/bookings/{id}/cancellation-fee

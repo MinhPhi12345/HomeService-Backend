@@ -25,8 +25,11 @@ public class MatchingOptions
     public int ManualSearchCooldownMinutes { get; set; } = 5;
     public int TickSeconds { get; set; } = 5;
     public int MaxRounds { get; set; } = 5;
-    /// <summary>BR-B02: một Tasker không nhận 2 đơn có giờ hẹn cách nhau dưới số giờ này.</summary>
-    public double ScheduleGapHours { get; set; } = 2;
+    /// <summary>
+    /// BR-B02 (SRS v1.8): mỗi đơn chiếm lịch Tasker từ giờ hẹn đến giờ hẹn + thời lượng ước tính + số phút di chuyển này.
+    /// Hai đơn của cùng Tasker không được chồng nhau.
+    /// </summary>
+    public int TravelBufferMinutes { get; set; } = 30;
     /// <summary>
     /// BR-P04 (bổ sung): ký quỹ – Tasker phải có số dư KHẢ DỤNG tối thiểu bằng mức này mới được bật nhận đơn,
     /// nhận lời mời và nhận đơn (mọi phương thức). Đơn tiền mặt còn phải đủ tiền chiết khấu.

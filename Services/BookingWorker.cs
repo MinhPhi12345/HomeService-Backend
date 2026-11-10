@@ -32,6 +32,8 @@ public class BookingWorker : BackgroundService
             await RunStepAsync<BookingJobs>(s => s.ExpireNoTaskerFoundAsync(stoppingToken), "hết hạn đơn chưa có Tasker", stoppingToken);
             await RunStepAsync<BookingJobs>(s => s.DetectNoShowAsync(stoppingToken), "phát hiện Tasker không đến", stoppingToken);
             await RunStepAsync<BookingJobs>(s => s.SendAppointmentRemindersAsync(stoppingToken), "nhắc lịch hẹn", stoppingToken);
+            // US30: tài khoản "chờ khóa" đã hết đơn đang dở → khóa có hiệu lực
+            await RunStepAsync<AccountLockService>(s => s.FinalizePendingLocksAsync(stoppingToken), "khóa tài khoản chờ", stoppingToken);
             // FR-31: đầu mỗi tháng tự chốt bảng xếp hạng Tasker xuất sắc tháng trước (kiểm tra 30 phút/lần)
             if (DateTime.UtcNow >= _nextAwardCheck)
             {

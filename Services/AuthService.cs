@@ -22,6 +22,17 @@ public class EmailNotVerifiedException : Exception
     }
 }
 
+/// <summary>Đăng nhập đúng mật khẩu nhưng tài khoản bị khóa → controller trả 403 kèm lý do khóa (US30, US48).</summary>
+public class AccountLockedException : Exception
+{
+    public User User { get; }
+
+    public AccountLockedException(User user) : base("Tài khoản đã bị khóa.")
+    {
+        User = user;
+    }
+}
+
 // EP01 - US01 (đăng ký + xác thực email bằng OTP), US02 (đăng nhập), quên mật khẩu bằng OTP
 public class AuthService : IAuthService
 {
@@ -86,8 +97,9 @@ public class AuthService : IAuthService
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             throw new UnauthorizedAccessException("Email hoặc mật khẩu không đúng.");
 
+        // US30/US48: đúng mật khẩu nhưng tài khoản bị khóa → báo lý do & cách gửi yêu cầu mở khóa
         if (!user.IsActive)
-            throw new UnauthorizedAccessException("Tài khoản đã bị khóa.");
+            throw new AccountLockedException(user);
 
         if (!user.EmailVerified)
         {

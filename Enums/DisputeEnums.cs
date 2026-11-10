@@ -7,7 +7,8 @@ public enum DisputeReason
     Incomplete = 1,     // Làm chưa xong / thiếu hạng mục
     PropertyDamage = 2, // Làm hư hỏng tài sản
     Behavior = 3,       // Thái độ không phù hợp
-    Other = 4           // Khác
+    Other = 4,          // Khác
+    TaskerLocked = 5    // Hệ thống tự mở: Tasker bị khóa tài khoản khi đơn đang thực hiện
 }
 
 public enum DisputeStatus

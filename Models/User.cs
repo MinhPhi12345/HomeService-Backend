@@ -27,6 +27,13 @@ public class User
     public bool IsCashBlocked { get; set; } = false;      // true → chỉ được thanh toán online
     public int UnpaidReportCount { get; set; } = 0;        // số lần bị báo không thanh toán
 
+    // US30 (SRS v1.8) – khóa tài khoản có lý do; "khóa sau khi hoàn tất đơn" dùng LockPendingAt
+    public AccountLockReason? LockReason { get; set; }
+    public string? LockDetail { get; set; }      // chi tiết lý do Admin ghi (gửi trong email cho người bị khóa)
+    public DateTime? LockedAt { get; set; }      // thời điểm khóa có hiệu lực (IsActive = false)
+    public DateTime? LockPendingAt { get; set; } // chờ khóa: không nhận đơn / đặt đơn mới, tự khóa khi các đơn đang dở kết thúc
+    public int? LockedById { get; set; }         // Admin thực hiện
+
     // Chỉ có giá trị khi Role = Tasker
     public TaskerProfile? TaskerProfile { get; set; }
 }

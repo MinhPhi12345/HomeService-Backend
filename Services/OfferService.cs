@@ -35,6 +35,9 @@ public class OfferService
         if (profile.SuspendedUntil is not null && profile.SuspendedUntil > now)
             throw ApiException.BadRequest($"Tài khoản của bạn đang bị tạm khóa nhận đơn đến {VnTime.Format(profile.SuspendedUntil.Value)}.");
 
+        if (await _db.Users.AnyAsync(u => u.Id == taskerId && u.LockPendingAt != null))
+            throw ApiException.BadRequest("Tài khoản của bạn đang chờ khóa nên không nhận thêm đơn mới.");
+
         var offer = await GetOfferAsync(booking.Id, booking.MatchRound, taskerId);
 
         if (booking.TaskerId != null || (booking.Status != BookingStatus.Pending && booking.Status != BookingStatus.Matched))
@@ -44,13 +47,14 @@ public class OfferService
             throw ApiException.Conflict("Đơn không còn nhận Tasker.");
         }
 
-        // BR-B02: không nhận 2 đơn cách nhau dưới 2 giờ
-        var gapFrom = booking.ScheduledTime.AddHours(-_matching.ScheduleGapHours);
-        var gapTo = booking.ScheduledTime.AddHours(_matching.ScheduleGapHours);
-        var conflict = await _db.Bookings.AnyAsync(b => b.TaskerId == taskerId && b.Id != booking.Id
-            && (b.Status == BookingStatus.Accepted || b.Status == BookingStatus.InProgress)
-            && b.ScheduledTime > gapFrom && b.ScheduledTime < gapTo);
-        if (conflict) throw ApiException.Conflict("Bạn đã có đơn khác trùng lịch (cách nhau dưới 2 giờ).");
+        // BR-B02: không nhận đơn chồng lịch với đơn đã nhận (theo thời lượng ước tính + thời gian di chuyển)
+        var conflict = (await TaskerSchedule.FindConflictsAsync(_db, new[] { taskerId }, booking, _matching.TravelBufferMinutes))
+            .OrderBy(c => c.ScheduledTime).FirstOrDefault();
+        if (conflict is not null)
+            throw ApiException.Conflict(
+                $"Bạn đã có đơn #{conflict.BookingId} lúc {VnTime.Format(conflict.ScheduledTime)} " +
+                $"(dự kiến xong khoảng {VnTime.Clock(conflict.ScheduledTime.AddMinutes(conflict.EstimatedMinutes), conflict.ScheduledTime)}), " +
+                "trùng lịch với đơn này.");
 
         // Ký quỹ: mọi đơn đều cần số dư khả dụng tối thiểu
         if (profile.AvailableBalance < _matching.MinWalletDeposit)

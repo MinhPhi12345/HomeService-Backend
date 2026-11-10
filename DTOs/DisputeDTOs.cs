@@ -66,5 +66,9 @@ public record DisputeResponse(
     int CustomerId,
     int TaskerId,
     DateTime? RedoScheduledTime,
-    DateTime TaskerResponseDueAt
+    DateTime TaskerResponseDueAt,
+    // SRS v1.8 – hạng mục & ảnh trước/sau theo hạng mục (hồ sơ phân xử)
+    IReadOnlyList<BookingItemDto>? Items = null,
+    IReadOnlyList<BookingPhotoDto>? Photos = null,
+    bool TaskerLocked = false
 );

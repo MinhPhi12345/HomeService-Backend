@@ -59,6 +59,9 @@ builder.Services.AddScoped<OtpService>();
 builder.Services.AddScoped<VoucherService>();
 builder.Services.AddScoped<PromotionService>();
 builder.Services.AddScoped<TaskerAwardService>();
+builder.Services.AddScoped<AccountEmailService>();
+builder.Services.AddScoped<AccountLockService>();
+builder.Services.AddScoped<AppealService>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 // Bản đồ & tra địa chỉ OpenStreetMap đi qua Backend (cache + User-Agent riêng)
 builder.Services.AddMemoryCache();
@@ -81,6 +84,7 @@ builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptio
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.Section));
 builder.Services.Configure<AwardOptions>(builder.Configuration.GetSection(AwardOptions.Section));
 builder.Services.Configure<PromotionOptions>(builder.Configuration.GetSection(PromotionOptions.Section));
+builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.Section));
 
 // --- Tác vụ nền: ghép nối theo đợt, hết hạn thanh toán, tự xác nhận... ---
 builder.Services.AddHostedService<BookingWorker>();

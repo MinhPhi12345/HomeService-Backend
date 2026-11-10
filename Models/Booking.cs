@@ -24,7 +24,9 @@ public class Booking
     public string? Note { get; set; }
     // SĐT liên hệ cho riêng đơn này (khách nhập khi đặt; bỏ trống => lấy SĐT hồ sơ lúc đặt)
     public string? ContactPhone { get; set; }
-    public int Quantity { get; set; } = 1;        // số giờ / số lần (1–12)
+    public int Quantity { get; set; } = 1;        // số lượng theo đơn vị của dịch vụ (trong khoảng min–max của dịch vụ)
+    /// <summary>Thời lượng ước tính (phút) = phút/đơn vị × số lượng, chốt lúc đặt đơn – dùng chống trùng lịch (BR-B02).</summary>
+    public int EstimatedMinutes { get; set; } = 120;
     public decimal TotalPrice { get; set; }       // = basePrice × quantity (BR-B01) – giá gốc, Tasker được tính theo giá này
 
     // FR-32 – mã giảm giá (chỉ đơn trả trước): khách trả TotalPrice − DiscountAmount, nền tảng chịu phần giảm (BR-V03)
@@ -77,4 +79,6 @@ public class Booking
     public Dispute? Dispute { get; set; }
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<BookingOffer> Offers { get; set; } = new List<BookingOffer>();
+    public ICollection<BookingItem> Items { get; set; } = new List<BookingItem>();
+    public ICollection<BookingPhoto> Photos { get; set; } = new List<BookingPhoto>();
 }

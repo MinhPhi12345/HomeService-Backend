@@ -128,13 +128,8 @@ public static class DbInitializer
     {
         if (await db.ServiceCategories.AnyAsync()) return;
 
-        db.ServiceCategories.AddRange(
-            new ServiceCategory { Name = "Dọn dẹp nhà", Description = "Quét dọn, lau nhà, vệ sinh bếp và nhà tắm theo giờ.", BasePrice = 150000, Unit = "giờ" },
-            new ServiceCategory { Name = "Giặt ủi", Description = "Giặt, sấy và ủi quần áo tại nhà.", BasePrice = 80000, Unit = "lần" },
-            new ServiceCategory { Name = "Sửa điện nước", Description = "Sửa chữa điện, nước, thay thiết bị cơ bản.", BasePrice = 200000, Unit = "lần" },
-            new ServiceCategory { Name = "Chăm sóc cây", Description = "Tưới, cắt tỉa, bón phân cây cảnh và vườn nhỏ.", BasePrice = 120000, Unit = "buổi" },
-            new ServiceCategory { Name = "Nấu ăn gia đình", Description = "Đi chợ và nấu bữa ăn cho gia đình.", BasePrice = 180000, Unit = "buổi" }
-        );
+        // SRS v1.8: kèm cấu hình số lượng, thời lượng, hạng mục và chi tiết dịch vụ
+        db.ServiceCategories.AddRange(ServiceCatalog.Defaults());
         await db.SaveChangesAsync();
     }
 }

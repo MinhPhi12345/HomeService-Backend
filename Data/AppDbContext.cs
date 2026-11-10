@@ -24,6 +24,9 @@ public class AppDbContext : DbContext
     public DbSet<Voucher> Vouchers => Set<Voucher>();
     public DbSet<VoucherRedemption> VoucherRedemptions => Set<VoucherRedemption>();
     public DbSet<GiftRule> GiftRules => Set<GiftRule>();
+    public DbSet<BookingItem> BookingItems => Set<BookingItem>();
+    public DbSet<BookingPhoto> BookingPhotos => Set<BookingPhoto>();
+    public DbSet<AccountAppeal> AccountAppeals => Set<AccountAppeal>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -59,6 +62,7 @@ public class AppDbContext : DbContext
             e.Property(u => u.PhoneNumber).HasMaxLength(15).IsUnicode(false);
             e.Property(u => u.Address).HasMaxLength(255);
             e.Property(u => u.AvatarUrl).HasMaxLength(500);
+            e.Property(u => u.LockDetail).HasMaxLength(1000);
         });
 
         modelBuilder.Entity<User>()
@@ -87,6 +91,38 @@ public class AppDbContext : DbContext
             e.Property(s => s.Description).HasMaxLength(1000);
             e.Property(s => s.Unit).HasMaxLength(20);
             e.Property(s => s.IconUrl).HasMaxLength(500);
+            e.Property(s => s.QuantityLabel).HasMaxLength(50);
+            e.Property(s => s.QuantityHint).HasMaxLength(200);
+            e.Property(s => s.Includes).HasMaxLength(1000);
+            e.Property(s => s.Excludes).HasMaxLength(1000);
+            e.Property(s => s.CustomerPrepares).HasMaxLength(1000);
+            e.Property(s => s.Notes).HasMaxLength(1000);
+        });
+
+        // BR-B05 – hạng mục & ảnh theo hạng mục của đơn
+        modelBuilder.Entity<BookingItem>(e =>
+        {
+            e.HasOne(i => i.Booking).WithMany(b => b.Items).HasForeignKey(i => i.BookingId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(i => i.Description).HasMaxLength(200);
+            e.HasIndex(i => new { i.BookingId, i.ItemNo }).IsUnique();
+        });
+        modelBuilder.Entity<BookingPhoto>(e =>
+        {
+            e.HasOne(p => p.Booking).WithMany(b => b.Photos).HasForeignKey(p => p.BookingId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(p => p.Url).HasMaxLength(500);
+            e.Property(p => p.Note).HasMaxLength(200);
+            e.HasIndex(p => new { p.BookingId, p.Stage });
+        });
+
+        // US48 – yêu cầu mở khóa tài khoản
+        modelBuilder.Entity<AccountAppeal>(e =>
+        {
+            e.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(a => a.Content).HasMaxLength(2000);
+            e.Property(a => a.AttachmentUrls).HasMaxLength(1600);
+            e.Property(a => a.AdminNote).HasMaxLength(1000);
+            e.HasIndex(a => new { a.UserId, a.CreatedAt });
+            e.HasIndex(a => a.Status);
         });
 
         modelBuilder.Entity<Booking>()

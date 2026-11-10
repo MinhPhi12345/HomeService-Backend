@@ -22,6 +22,55 @@ namespace HomeService.Api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HomeService.Api.Models.AccountAppeal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("AttachmentUrls")
+                        .IsRequired()
+                        .HasMaxLength(1600)
+                        .HasColumnType("nvarchar(1600)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ResolvedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("AccountAppeals");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.AuditLog", b =>
                 {
                     b.Property<long>("Id")
@@ -124,6 +173,9 @@ namespace HomeService.Api.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("EstimatedMinutes")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsAutoConfirmed")
                         .HasColumnType("bit");
 
@@ -213,6 +265,33 @@ namespace HomeService.Api.Migrations
                     b.ToTable("Bookings");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.BookingItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ItemNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId", "ItemNo")
+                        .IsUnique();
+
+                    b.ToTable("BookingItems");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.BookingOffer", b =>
                 {
                     b.Property<int>("Id")
@@ -261,6 +340,42 @@ namespace HomeService.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("BookingOffers");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.BookingPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ItemNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId", "Stage");
+
+                    b.ToTable("BookingPhotos");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.Dispute", b =>
@@ -619,7 +734,15 @@ namespace HomeService.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CustomerPrepares")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Excludes")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
@@ -627,13 +750,41 @@ namespace HomeService.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("Includes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<int>("MaxQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinutesPerUnit")
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("QuantityHint")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("QuantityLabel")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("RequiresItemList")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -883,6 +1034,22 @@ namespace HomeService.Api.Migrations
                     b.Property<bool>("IsCashBlocked")
                         .HasColumnType("bit");
 
+                    b.Property<string>("LockDetail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("LockPendingAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("LockReason")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("LockedById")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("OutstandingAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1090,6 +1257,17 @@ namespace HomeService.Api.Migrations
                     b.ToTable("WalletTransactions");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.AccountAppeal", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.Booking", b =>
                 {
                     b.HasOne("HomeService.Api.Models.User", "Customer")
@@ -1123,6 +1301,17 @@ namespace HomeService.Api.Migrations
                     b.Navigation("Voucher");
                 });
 
+            modelBuilder.Entity("HomeService.Api.Models.BookingItem", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.Booking", "Booking")
+                        .WithMany("Items")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
             modelBuilder.Entity("HomeService.Api.Models.BookingOffer", b =>
                 {
                     b.HasOne("HomeService.Api.Models.Booking", "Booking")
@@ -1140,6 +1329,17 @@ namespace HomeService.Api.Migrations
                     b.Navigation("Booking");
 
                     b.Navigation("Tasker");
+                });
+
+            modelBuilder.Entity("HomeService.Api.Models.BookingPhoto", b =>
+                {
+                    b.HasOne("HomeService.Api.Models.Booking", "Booking")
+                        .WithMany("Photos")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
                 });
 
             modelBuilder.Entity("HomeService.Api.Models.Dispute", b =>
@@ -1309,9 +1509,13 @@ namespace HomeService.Api.Migrations
                 {
                     b.Navigation("Dispute");
 
+                    b.Navigation("Items");
+
                     b.Navigation("Offers");
 
                     b.Navigation("Payment");
+
+                    b.Navigation("Photos");
 
                     b.Navigation("Reviews");
                 });

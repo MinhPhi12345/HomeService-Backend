@@ -135,7 +135,7 @@ public class OfferServiceTests : TestBase
     }
 
     [Fact]
-    public async Task Accept_TrungLichDuoi2Gio_409()
+    public async Task Accept_TrungLichTheoThoiLuong_409()
     {
         var (booking, tasker) = MatchedWithOffer();
         Db.Booking(Db.Customer(), Db.Service("Giặt ủi"), BookingStatus.Accepted, tasker,

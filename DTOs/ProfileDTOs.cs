@@ -30,7 +30,9 @@ public record ProfileResponse(
     // Bổ sung: khoản đang nợ & quyền thanh toán tiền mặt (FR-27) để FE hiện nhắc trả nợ
     decimal OutstandingAmount,
     bool IsCashBlocked,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    // US30 – tài khoản đang chờ khóa (chỉ hoàn thành đơn đang dở, không nhận / đặt đơn mới)
+    DateTime? LockPendingAt = null
 );
 
 /// <summary>Đổi mật khẩu khi đã đăng nhập: cần mật khẩu hiện tại + mã OTP gửi về email.</summary>

@@ -26,6 +26,7 @@ public abstract class TestBase : IDisposable
     protected FakeEmailSender Emails { get; } = new();
     protected AwardOptions AwardOptions { get; } = new();
     protected PromotionOptions PromotionOptions { get; } = new();
+    protected AccountOptions AccountOptions { get; } = new();
 
     protected NotificationService CreateNotifications() => new(Db);
     protected OtpService CreateOtp() => new(Db, Emails, MsOptions.Create(OtpOptions), NullLogger<OtpService>.Instance);
@@ -61,6 +62,15 @@ public abstract class TestBase : IDisposable
     protected BookingJobs CreateJobs() => new(Db, CreateNotifications(), CreateSettlement(), MsOptions.Create(SettlementOptions),
         NullLogger<BookingJobs>.Instance, CreateCancellation(), CreateDiscipline(), CreateWallet(),
         MsOptions.Create(NotificationOptions), CreateVouchers());
+
+    protected AccountEmailService CreateAccountEmails() =>
+        new(Emails, MsOptions.Create(AccountOptions), NullLogger<AccountEmailService>.Instance);
+
+    protected AccountLockService CreateLocks() => new(Db, CreateCancellation(), CreateWallet(), CreateNotifications(),
+        CreateAudit(), CreateAccountEmails(), MsOptions.Create(BusinessOptions), NullLogger<AccountLockService>.Instance);
+
+    protected AppealService CreateAppeals() => new(Db, CreateOtp(), CreateLocks(), CreateAccountEmails(), CreateNotifications(),
+        CreateAudit(), MsOptions.Create(AccountOptions));
 
     public virtual void Dispose()
     {

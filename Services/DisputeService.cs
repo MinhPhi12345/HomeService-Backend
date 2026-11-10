@@ -136,6 +136,9 @@ public class DisputeService
                 refund = amount;
                 break;
             case DisputeResolution.Redo:
+                // US30: Tasker đã bị khóa (hoặc chờ khóa) thì không thể giao làm lại
+                if (await _db.Users.AnyAsync(u => u.Id == dispute.TaskerId && (!u.IsActive || u.LockPendingAt != null)))
+                    throw ApiException.BadRequest("Tasker đã bị khóa tài khoản nên không thể làm lại. Vui lòng chọn hoàn tiền.");
                 if (request.RedoScheduledTime is null) throw ApiException.BadRequest("Thời gian đặt không hợp lệ.");
                 redoTime = _bookings.ValidateScheduledTime(request.RedoScheduledTime.Value);
                 break;
@@ -251,8 +254,11 @@ public class DisputeService
 
     public IQueryable<Dispute> QueryWithDetails() => _db.Disputes.AsNoTracking()
         .Include(d => d.Booking).ThenInclude(b => b!.Payment)
+        .Include(d => d.Booking).ThenInclude(b => b!.Items)
+        .Include(d => d.Booking).ThenInclude(b => b!.Photos)
         .Include(d => d.Customer)
-        .Include(d => d.Tasker);
+        .Include(d => d.Tasker)
+        .AsSplitQuery();
 
     public DisputeResponse ToResponse(Dispute d) => new(
         d.Id, d.BookingId, d.Booking?.Payment?.Amount ?? d.Booking?.TotalPrice ?? 0,
@@ -262,5 +268,8 @@ public class DisputeService
         d.Booking?.CheckInPhotoUrl, d.Booking?.CheckOutPhotoUrl,
         d.TaskerResponse, Dispute.SplitUrls(d.TaskerEvidenceUrls),
         d.Status, d.Resolution, d.RefundAmount, d.AdminNote, d.CreatedAt, d.ResolvedAt,
-        d.CustomerId, d.TaskerId, d.RedoScheduledTime, d.CreatedAt.AddHours(_opt.TaskerResponseHours));
+        d.CustomerId, d.TaskerId, d.RedoScheduledTime, d.CreatedAt.AddHours(_opt.TaskerResponseHours),
+        d.Booking?.Items.OrderBy(i => i.ItemNo).Select(i => new BookingItemDto(i.ItemNo, i.Description)).ToList(),
+        d.Booking is null ? null : BookingMapper.PhotosOf(d.Booking),
+        d.Tasker is { } t && (!t.IsActive || t.LockPendingAt != null));
 }

@@ -81,10 +81,11 @@ public class CancellationService
         booking.Payment is { Status: PaymentStatus.Held } p ? p.Amount - Math.Min(fee, p.Amount) : 0m;
 
     /// <summary>Hủy đơn: đóng lời mời, hoàn tiền tạm giữ (trừ phí hủy nếu có), báo Tasker, giải phóng tạm giữ ví.</summary>
-    public async Task CancelAsync(Booking booking, string reason, bool bySystem = false)
+    /// <param name="waiveFee">true khi hệ thống hủy vì lý do không phải lỗi của khách (vd tài khoản bị khóa) → không tính phí hủy.</param>
+    public async Task CancelAsync(Booking booking, string reason, bool bySystem = false, bool waiveFee = false)
     {
         var now = DateTime.UtcNow;
-        var (fee, feeReason) = await CalculateFeeAsync(booking);
+        var (fee, feeReason) = waiveFee ? (0m, reason) : await CalculateFeeAsync(booking);
 
         await using var tx = await _db.Database.BeginTransactionAsync();
         var taskerId = booking.TaskerId;
