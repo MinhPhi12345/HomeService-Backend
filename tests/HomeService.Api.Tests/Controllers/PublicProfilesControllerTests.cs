@@ -57,4 +57,38 @@ public class PublicProfilesControllerTests : TestBase
         Assert.IsType<NotFoundResult>((await As(customer).Get(999)).Result);
         Assert.Equal("Nguyễn Minh Anh", (await new PublicProfilesController(Db).AsUser(1, UserRole.Admin).Get(customer.Id)).OkValue().DisplayName);
     }
+
+    [Fact]
+    public async Task HoSoChiKemBaDanhGiaMoiNhat_SoLuongTheoSao_XemDuCoLocSaoVaPhanTrang()
+    {
+        var customer = Db.Customer("Nguyễn Minh Anh");
+        var tasker = Db.Tasker("Ngô Thị Mai");
+        var start = DateTime.UtcNow.AddDays(-30);
+        var ratings = new[] { 5, 5, 4, 5, 3, 5, 4, 5, 5, 1, 5, 4 }; // 7×5★, 3×4★, 1×3★, 1×1★
+        for (var i = 0; i < ratings.Length; i++)
+        {
+            var b = Db.Booking(customer, Db.Service(), BookingStatus.Paid, tasker);
+            var r = Db.Review(b, customer, tasker, ratings[i], comment: $"Nhận xét {i}");
+            r.CreatedAt = start.AddDays(i);
+        }
+        Db.SaveChanges();
+
+        var p = (await As(customer).Get(tasker.Id)).OkValue();
+        Assert.Equal(12, p.ReviewCount);
+        Assert.Equal(3, p.Reviews.Count);
+        Assert.Equal("Nhận xét 11", p.Reviews[0].Comment); // mới nhất trước
+        Assert.Equal(new[] { 7, 3, 1, 0, 1 }, p.RatingBreakdown!.Select(x => x.Count));
+        Assert.Equal(new[] { 5, 4, 3, 2, 1 }, p.RatingBreakdown!.Select(x => x.Stars));
+
+        var page1 = (await As(customer).GetReviews(tasker.Id, null, 1, 5)).OkValue();
+        var page3 = (await As(customer).GetReviews(tasker.Id, null, 3, 5)).OkValue();
+        Assert.Equal((12, 5, 2), (page1.TotalCount, page1.Items.Count, page3.Items.Count));
+
+        var four = (await As(customer).GetReviews(tasker.Id, 4, null, null)).OkValue();
+        Assert.Equal(3, four.TotalCount);
+        Assert.All(four.Items, x => Assert.Equal(4, x.Rating));
+        Assert.All(four.Items, x => Assert.Equal("Anh", x.ReviewerName));
+
+        Assert.IsType<ForbidResult>((await As(Db.Customer("Người lạ")).GetReviews(tasker.Id, null, null, null)).Result);
+    }
 }

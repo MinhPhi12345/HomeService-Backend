@@ -106,7 +106,7 @@ public class BookingsController : ControllerBase
         {
             // FR-31 – huy hiệu Tasker xuất sắc tháng của Tasker phụ trách
             var badges = await TaskerAwardService.BadgesAsync(_db, new[] { taskerId });
-            response.TaskerBadges = badges.GetValueOrDefault(taskerId)?.Select(b => b.Label).ToList() ?? new List<string>();
+            response.TaskerBadges = badges.GetValueOrDefault(taskerId)?.Select(b => $"Hạng {b.Rank} · {b.Label}").ToList() ?? new List<string>();
         }
         return Ok(response);
     }

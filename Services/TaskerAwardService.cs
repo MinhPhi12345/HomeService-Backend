@@ -5,7 +5,9 @@ using HomeService.Api.Enums;
 using HomeService.Api.Models;
 using HomeService.Api.Options;
 using HomeService.Api.Services.Interfaces;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace HomeService.Api.Services;
@@ -26,10 +28,13 @@ public class TaskerAwardService
     private readonly AwardOptions _opt;
     private readonly BusinessOptions _business;
     private readonly ILogger<TaskerAwardService> _logger;
+    private readonly IMemoryCache? _cache;
 
     public TaskerAwardService(AppDbContext db, WalletService wallet, INotificationService notifications, AuditService audit,
-        IEmailSender email, IOptions<AwardOptions> options, IOptions<BusinessOptions> business, ILogger<TaskerAwardService> logger)
+        IEmailSender email, IOptions<AwardOptions> options, IOptions<BusinessOptions> business, ILogger<TaskerAwardService> logger,
+        IMemoryCache? cache = null)
     {
+        _cache = cache;
         _db = db;
         _wallet = wallet;
         _notifications = notifications;
@@ -86,17 +91,25 @@ public class TaskerAwardService
     /// </summary>
     public ScoredTasker Score(TaskerMetrics m, int maxCompleted)
     {
+        var p = Parts(m, maxCompleted);
+        var score = _opt.RatingWeight * p.Rating + _opt.CompletedWeight * p.Completed + _opt.AcceptanceWeight * p.Acceptance
+                    + _opt.OnTimeWeight * p.OnTime + _opt.NoDisputeWeight * p.NoDispute;
+        var avg = m.ReviewCount == 0 ? 0 : m.RatingSum / m.ReviewCount;
+        return new ScoredTasker(m, Math.Round(score, 4), Math.Round(avg, 2), Math.Round(p.Acceptance, 4), Math.Round(p.OnTime, 4));
+    }
+
+    /// <summary>Điểm thành phần 0–1 của 5 tiêu chí (BR-T02), trước khi nhân tỷ trọng.</summary>
+    public record ScoreParts(decimal Rating, decimal Completed, decimal Acceptance, decimal OnTime, decimal NoDispute);
+
+    public ScoreParts Parts(TaskerMetrics m, int maxCompleted)
+    {
         var bayes = (_opt.RatingPriorCount * _opt.RatingPriorMean + m.RatingSum) / (_opt.RatingPriorCount + m.ReviewCount);
         var rating = Math.Clamp((bayes - 1) / 4, 0, 1);
         var completed = maxCompleted == 0 ? 0 : Math.Clamp((decimal)m.Completed / maxCompleted, 0, 1);
         var acceptance = m.Answered == 0 ? 1 : (decimal)m.Accepted / m.Answered;
         var onTime = m.Started == 0 ? 1 : (decimal)m.OnTime / m.Started;
         var noDispute = m.Completed == 0 ? 1 : 1 - Math.Min(1, (decimal)m.Disputes / m.Completed);
-
-        var score = _opt.RatingWeight * rating + _opt.CompletedWeight * completed + _opt.AcceptanceWeight * acceptance
-                    + _opt.OnTimeWeight * onTime + _opt.NoDisputeWeight * noDispute;
-        var avg = m.ReviewCount == 0 ? 0 : m.RatingSum / m.ReviewCount;
-        return new ScoredTasker(m, Math.Round(score, 4), Math.Round(avg, 2), Math.Round(acceptance, 4), Math.Round(onTime, 4));
+        return new ScoreParts(rating, completed, acceptance, onTime, noDispute);
     }
 
     /// <summary>Thu thập chỉ số của mọi Tasker đã duyệt trong tháng (xử lý ở bộ nhớ để chạy được cả SQLite lẫn SQL Server).</summary>
@@ -463,6 +476,125 @@ public class TaskerAwardService
             $"Xuất Excel Tasker xuất sắc tháng {MonthLabel(year, month)} ({result.Items.Count} dòng, có email và SĐT)");
         await _db.SaveChangesAsync();
         return result;
+    }
+
+    // ================= Xếp hạng tạm tính tháng đang diễn ra =================
+    // Tasker xem hạng của mình (GET /api/tasker-ranking/me); khách thấy nhãn "Đang trong top N" ở hồ sơ công khai.
+    // Chỉ để tham khảo: kết quả chính thức vẫn là bảng chốt sau khi hết tháng và được Admin duyệt.
+
+    public record LiveRanking(int Year, int Month, DateTime ComputedAt, IReadOnlyList<TaskerMetrics> All,
+        IReadOnlyList<ScoredTasker> Ranked, int MaxCompleted);
+
+    private static readonly TimeSpan LiveCacheFor = TimeSpan.FromMinutes(2);
+
+    public int TopCount => Math.Max(1, _opt.TopCount);
+
+    /// <summary>Bảng xếp hạng tạm tính của tháng hiện tại (giờ Việt Nam), lưu đệm 2 phút.</summary>
+    public async Task<LiveRanking> LiveRankingAsync()
+    {
+        var (y, m) = VnMonthOf(DateTime.UtcNow);
+        var key = $"tasker-award-live-{y}-{m}";
+        if (_cache is not null && _cache.TryGetValue<LiveRanking>(key, out var hit) && hit is not null) return hit;
+
+        var all = await CollectMetricsAsync(y, m);
+        var eligible = all.Where(IsEligible).ToList();
+        var live = new LiveRanking(y, m, DateTime.UtcNow, all, Rank(all), eligible.Count == 0 ? 0 : eligible.Max(x => x.Completed));
+        _cache?.Set(key, live, LiveCacheFor);
+        return live;
+    }
+
+    /// <summary>Tasker đang nằm trong top N tạm tính của tháng này.</summary>
+    public async Task<bool> IsInLiveTopAsync(int taskerId) =>
+        (await LiveRankingAsync()).Ranked.Take(TopCount).Any(s => s.Metrics.TaskerId == taskerId);
+
+    public AwardRulesResponse Rules() => new(
+        TopCount, _opt.MinCompletedBookings, _opt.MinReviews, _opt.OnTimeGraceMinutes,
+        _opt.RatingWeight, _opt.CompletedWeight, _opt.AcceptanceWeight, _opt.OnTimeWeight, _opt.NoDisputeWeight,
+        _business.CommissionRate, _opt.EffectiveTiers.Select(ToTierResponse).ToList());
+
+    private AwardTierResponse ToTierResponse(AwardTier t) => new(t.FromRank, t.ToRank, t.Bonus,
+        t.CommissionRate is { } r && r < _business.CommissionRate ? r : null, t.Gift);
+
+    private static decimal Points(decimal score) => Math.Round(Math.Max(0, score) * 100, 2);
+
+    private static string Num(decimal v) => v.ToString("0.0", CultureInfo.InvariantCulture).Replace('.', ',');
+
+    /// <summary>Hạng tạm tính, điều kiện còn thiếu, điểm từng tiêu chí, top N, quy tắc và lịch sử nhận thưởng của 1 Tasker.</summary>
+    public async Task<MyRankingResponse> MyRankingAsync(int taskerId)
+    {
+        var live = await LiveRankingAsync();
+        var top = TopCount;
+        var me = live.All.FirstOrDefault(x => x.TaskerId == taskerId);
+        var m = me ?? new TaskerMetrics(taskerId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true);
+
+        var missing = new List<string>();
+        if (me is null) missing.Add("Hồ sơ Tasker chưa được duyệt nên chưa được xét xếp hạng.");
+        else
+        {
+            if (!m.IsActive) missing.Add("Tài khoản đang bị khóa.");
+            if (m.Completed < _opt.MinCompletedBookings)
+                missing.Add($"Cần thêm {_opt.MinCompletedBookings - m.Completed} đơn hoàn tất (đã có {m.Completed}/{_opt.MinCompletedBookings}).");
+            if (m.ReviewCount < _opt.MinReviews)
+                missing.Add($"Cần thêm {_opt.MinReviews - m.ReviewCount} đánh giá hợp lệ (đã có {m.ReviewCount}/{_opt.MinReviews}).");
+            if (m.NoShows > 0) missing.Add("Có lần không đến trong tháng nên tháng này không được xét.");
+            if (m.LostDisputes > 0) missing.Add("Có khiếu nại được xử lý bất lợi trong tháng nên tháng này không được xét.");
+        }
+
+        var eligible = me is not null && IsEligible(m);
+        var maxCompleted = Math.Max(live.MaxCompleted, m.Completed);
+        int? rank = null;
+        for (var i = 0; i < live.Ranked.Count; i++)
+            if (live.Ranked[i].Metrics.TaskerId == taskerId) { rank = i + 1; break; }
+        var scored = rank is { } rk ? live.Ranked[rk - 1] : Score(m, maxCompleted);
+        var parts = Parts(m, rank is null ? maxCompleted : live.MaxCompleted);
+        var refMax = rank is null ? maxCompleted : live.MaxCompleted;
+        var inTop = rank is { } r0 && r0 <= top;
+
+        decimal? behindPrevious = rank is > 1 ? Points(live.Ranked[rank.Value - 2].Score - scored.Score) : null;
+        decimal? toTop = inTop ? null
+            : live.Ranked.Count < top ? 0
+            : Points(live.Ranked[top - 1].Score - scored.Score);
+
+        var avg = m.ReviewCount == 0 ? 0 : Math.Round(m.RatingSum / m.ReviewCount, 2);
+        var scoreParts = new List<AwardScorePartResponse>
+        {
+            new("rating", "Đánh giá của khách", _opt.RatingWeight, Math.Round(parts.Rating, 4), Points(_opt.RatingWeight * parts.Rating),
+                m.ReviewCount == 0 ? "Chưa có đánh giá trong tháng" : $"{Num(avg)}★ từ {m.ReviewCount} đánh giá"),
+            new("completed", "Số đơn hoàn tất", _opt.CompletedWeight, Math.Round(parts.Completed, 4), Points(_opt.CompletedWeight * parts.Completed),
+                refMax == 0 ? $"{m.Completed} đơn" : $"{m.Completed} đơn · người nhiều nhất {refMax} đơn"),
+            new("acceptance", "Tỷ lệ nhận lời mời", _opt.AcceptanceWeight, Math.Round(parts.Acceptance, 4), Points(_opt.AcceptanceWeight * parts.Acceptance),
+                m.Answered == 0 ? "Chưa có lời mời nào" : $"Nhận {m.Accepted}/{m.Answered} lời mời"),
+            new("onTime", "Bắt đầu đúng giờ", _opt.OnTimeWeight, Math.Round(parts.OnTime, 4), Points(_opt.OnTimeWeight * parts.OnTime),
+                m.Started == 0 ? "Chưa có đơn nào" : $"{m.OnTime}/{m.Started} đơn đúng giờ"),
+            new("noDispute", "Không bị khiếu nại", _opt.NoDisputeWeight, Math.Round(parts.NoDispute, 4), Points(_opt.NoDisputeWeight * parts.NoDispute),
+                m.Disputes == 0 ? "Không có khiếu nại" : $"{m.Disputes} khiếu nại"),
+        };
+
+        var board = live.Ranked.Take(top).ToList();
+        var ids = board.Select(s => s.Metrics.TaskerId).ToList();
+        var users = await _db.Users.AsNoTracking().Where(u => ids.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.AvatarUrl }).ToListAsync();
+        var leaderboard = board.Select((s, i) =>
+        {
+            var u = users.FirstOrDefault(x => x.Id == s.Metrics.TaskerId);
+            var isMe = s.Metrics.TaskerId == taskerId;
+            return new LeaderboardEntryResponse(i + 1, isMe ? u?.FullName ?? string.Empty : NameHelper.GivenName(u?.FullName),
+                UploadUrl.Normalize(u?.AvatarUrl), Points(s.Score), s.Metrics.Completed, s.RatingAverage, isMe);
+        }).ToList();
+
+        var history = await _db.TaskerMonthlyAwards.AsNoTracking()
+            .Where(a => a.TaskerId == taskerId && a.Status == TaskerAwardStatus.Approved)
+            .Select(a => new MyAwardHistoryResponse(a.Year, a.Month, a.Rank, a.BonusAmount, a.PreferentialRate, a.HasGift,
+                a.GiftDescription, a.ApprovedAt))
+            .ToListAsync();
+        history = history.OrderByDescending(h => h.Year).ThenByDescending(h => h.Month).Take(12).ToList();
+
+        var tier = inTop ? _opt.TierFor(rank!.Value) : null;
+        var (_, monthEnd) = MonthRange(live.Year, live.Month);
+        return new MyRankingResponse(live.Year, live.Month, monthEnd, live.ComputedAt, eligible, missing,
+            rank, live.Ranked.Count, inTop, Points(scored.Score), behindPrevious, toTop,
+            tier is null ? null : ToTierResponse(tier),
+            m.Completed, m.ReviewCount, avg, scoreParts, leaderboard, history, Rules());
     }
 
     // ================= Dùng ở nơi khác =================

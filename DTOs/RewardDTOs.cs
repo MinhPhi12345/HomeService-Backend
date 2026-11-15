@@ -7,6 +7,44 @@ namespace HomeService.Api.DTOs;
 
 public record AwardBadgeResponse(int Year, int Month, int Rank, string Label);
 
+// ----- Xếp hạng tạm tính tháng đang diễn ra (Tasker xem hạng của mình) -----
+
+public record AwardTierResponse(int FromRank, int ToRank, decimal Bonus, decimal? CommissionRate, bool Gift);
+
+/// <summary>Quy tắc xét Tasker xuất sắc tháng (BR-T01 → BR-T04) để hiển thị cho Tasker. Tỷ trọng có tổng = 1.</summary>
+public record AwardRulesResponse(
+    int TopCount, int MinCompletedBookings, int MinReviews, int OnTimeGraceMinutes,
+    decimal RatingWeight, decimal CompletedWeight, decimal AcceptanceWeight, decimal OnTimeWeight, decimal NoDisputeWeight,
+    decimal DefaultCommissionRate, IReadOnlyList<AwardTierResponse> Tiers);
+
+/// <summary>Một tiêu chí chấm điểm: Value 0–1 trước khi nhân tỷ trọng, Points = điểm đóng góp (thang 100).</summary>
+public record AwardScorePartResponse(string Key, string Label, decimal Weight, decimal Value, decimal Points, string Detail);
+
+/// <summary>Một dòng trong top N tạm tính. Người khác chỉ hiện tên gọi.</summary>
+public record LeaderboardEntryResponse(int Rank, string DisplayName, string? AvatarUrl, decimal Score, int CompletedBookings,
+    decimal RatingAverage, bool IsMe);
+
+public record MyAwardHistoryResponse(int Year, int Month, int Rank, decimal BonusAmount, decimal? PreferentialRate, bool HasGift,
+    string? GiftDescription, DateTime? ApprovedAt);
+
+/// <summary>
+/// GET /api/tasker-ranking/me. Rank = hạng tạm tính trong số Tasker đủ điều kiện (null nếu chưa đủ); Score, PointsBehindPrevious
+/// (điểm cần thêm để vượt người xếp ngay trên), PointsToTop (điểm cần thêm để vào top N, 0 = chỉ cần đủ điều kiện) theo thang 100.
+/// </summary>
+public record MyRankingResponse(
+    int Year, int Month, DateTime MonthEnd, DateTime UpdatedAt,
+    bool Eligible, IReadOnlyList<string> MissingConditions,
+    int? Rank, int EligibleCount, bool InTop, decimal Score, decimal? PointsBehindPrevious, decimal? PointsToTop,
+    AwardTierResponse? CurrentReward,
+    int CompletedBookings, int ReviewCount, decimal RatingAverage,
+    IReadOnlyList<AwardScorePartResponse> ScoreParts,
+    IReadOnlyList<LeaderboardEntryResponse> Leaderboard,
+    IReadOnlyList<MyAwardHistoryResponse> History,
+    AwardRulesResponse Rules);
+
+/// <summary>Nhãn "Đang trong top N Tasker tháng này" ở hồ sơ công khai (không ghi số hạng tạm tính vì còn thay đổi).</summary>
+public record CurrentTopResponse(int Year, int Month, int TopCount, string Label);
+
 public record TaskerAwardResponse(
     int Id, int Year, int Month, int TaskerId, string TaskerName, string? Email, string? PhoneNumber, string? AvatarUrl,
     string? WorkingArea, int Rank, decimal Score, int CompletedBookings, int ReviewCount, decimal RatingAverage,
